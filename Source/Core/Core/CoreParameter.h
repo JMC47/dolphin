@@ -139,6 +139,8 @@ struct SCoreStartupParameter
 	int iBBDumpPort;
 	bool bVBeamSpeedHack;
 	bool bSyncGPU;
+	// 0 - force off. 1 - force on. 2 - only in netplay/recording
+	int iDeterministicGPUSync;
 	bool bFastDiscSpeed;
 
 	int SelectedLanguage;
