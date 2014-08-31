@@ -13,7 +13,6 @@ public:
 	virtual ~CEXIMemoryCard();
 	void SetCS(int cs) override;
 	bool IsInterruptSet() override;
-	bool UseDelayedTransferCompletion() override;
 	bool IsPresent() override;
 	void DoState(PointerWrap &p) override;
 	IEXIDevice* FindDevice(TEXIDevices device_type, int customIndex=-1) override;
@@ -28,14 +27,8 @@ private:
 	// Scheduled when a command that required delayed end signaling is done.
 	static void CmdDoneCallback(u64 userdata, int cyclesLate);
 
-	// Scheduled when memory card is done transferring data
-	static void TransferCompleteCallback(u64 userdata, int cyclesLate);
-
 	// Signals that the command that was previously executed is now done.
 	void CmdDone();
-
-	// Signals that the transfer that was previously executed is now done.
-	void TransferComplete();
 
 	// Variant of CmdDone which schedules an event later in the future to complete the command.
 	void CmdDoneLater(u64 cycles);
