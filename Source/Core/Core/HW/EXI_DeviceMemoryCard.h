@@ -53,7 +53,7 @@ private:
 	};
 
 	int card_index;
-	int et_cmd_done, et_transfer_complete;
+	int et_cmd_done;
 	//! memory card state
 
 	// STATE_TO_SAVE

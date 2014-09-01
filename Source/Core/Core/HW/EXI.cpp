@@ -108,6 +108,11 @@ IEXIDevice* FindDevice(TEXIDevices device_type, int customIndex)
 	return nullptr;
 }
 
+CEXIChannel* FindChannel(int channelID)
+{
+	return g_Channels[channelID];
+}
+
 void UpdateInterrupts()
 {
 	// Interrupts are mapped a bit strangely:
