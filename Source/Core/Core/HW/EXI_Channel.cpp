@@ -50,6 +50,8 @@ CEXIChannel::CEXIChannel(u32 ChannelId) :
 
 CEXIChannel::~CEXIChannel()
 {
+	CoreTiming::RemoveEvent(updateInterrupts);
+	CoreTiming::RemoveEvent(transferComplete);
 	RemoveDevices();
 }
 
