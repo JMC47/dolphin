@@ -52,6 +52,11 @@ private:
 		cmdChipErase        = 0xF4,
 	};
 
+	// Memory Card timing information
+	u64 tSHSL;
+	u64 tPP;
+	u64 tSE;
+
 	int card_index;
 	int et_cmd_done;
 	//! memory card state

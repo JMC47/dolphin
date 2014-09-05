@@ -118,6 +118,10 @@ CEXIMemoryCard::CEXIMemoryCard(const int index, bool gciFolder)
 	u8 header[20] = {0};
 	memorycard->Read(0, ArraySize(header), header);
 	SetCardFlashID(header, card_index);
+
+	tSHSL = SystemTimers::GetTicksPerSecond() * 100ULL / 1000000000ULL;
+	tPP = SystemTimers::GetTicksPerSecond() * 1400ULL / 1000000ULL;
+	tSE = SystemTimers::GetTicksPerSecond() * 80ULL / 1000ULL;
 }
 
 void CEXIMemoryCard::SetupGciFolder(u16 sizeMb)
@@ -248,7 +252,7 @@ void CEXIMemoryCard::CmdDone()
 void CEXIMemoryCard::CmdDoneLater(u64 cycles)
 {
 	CoreTiming::RemoveEvent(et_cmd_done);
-	CoreTiming::ScheduleEvent((int)cycles, et_cmd_done, (u64)card_index);
+	CoreTiming::ScheduleEvent(static_cast<int>(cycles), et_cmd_done, static_cast<u64>(card_index));
 }
 
 void CEXIMemoryCard::SetCS(int cs)
@@ -270,7 +274,7 @@ void CEXIMemoryCard::SetCS(int cs)
 
 				//???
 
-				CmdDoneLater(5000);
+				CmdDoneLater(tSHSL + tSE);
 			}
 			break;
 
@@ -298,7 +302,7 @@ void CEXIMemoryCard::SetCS(int cs)
 					address = (address & ~0x1FF) | ((address+1) & 0x1FF);
 				}
 
-				CmdDoneLater(5000);
+				CmdDoneLater(tSHSL + tPP);
 			}
 			break;
 		}
