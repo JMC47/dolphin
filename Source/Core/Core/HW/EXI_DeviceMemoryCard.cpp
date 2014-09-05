@@ -121,7 +121,9 @@ CEXIMemoryCard::CEXIMemoryCard(const int index, bool gciFolder)
 
 	tSHSL = SystemTimers::GetTicksPerSecond() * 100ULL / 1000000000ULL;
 	tPP = SystemTimers::GetTicksPerSecond() * 1400ULL / 1000000ULL;
-	tSE = SystemTimers::GetTicksPerSecond() * 80ULL / 1000ULL;
+	tSE = SystemTimers::GetTicksPerSecond() * 60ULL / 1000ULL;
+
+	WARN_LOG(EXPANSIONINTERFACE, "EXIChannel[%d]: Timing Information (tSHSL: %llu, tPP: %llu, tSE: %llu)", card_index, tSHSL, tPP, tSE);
 }
 
 void CEXIMemoryCard::SetupGciFolder(u16 sizeMb)
@@ -247,10 +249,13 @@ void CEXIMemoryCard::CmdDone()
 	status &= ~MC_STATUS_BUSY;
 
 	m_bInterruptSet = 1;
+	ExpansionInterface::UpdateInterrupts();
+	WARN_LOG(EXPANSIONINTERFACE, "EXIChannel[%d]: CmdDone", card_index);
 }
 
 void CEXIMemoryCard::CmdDoneLater(u64 cycles)
 {
+	WARN_LOG(EXPANSIONINTERFACE, "EXIChannel[%d]: CmdDoneLater (cycles: %llu)", card_index, cycles);
 	CoreTiming::RemoveEvent(et_cmd_done);
 	CoreTiming::ScheduleEvent(static_cast<int>(cycles), et_cmd_done, static_cast<u64>(card_index));
 }
@@ -260,9 +265,11 @@ void CEXIMemoryCard::SetCS(int cs)
 	if (cs)  // not-selected to selected
 	{
 		m_uPosition = 0;
+		WARN_LOG(EXPANSIONINTERFACE, "EXIChannel[%d]: CS Select", card_index);
 	}
 	else
 	{
+		WARN_LOG(EXPANSIONINTERFACE, "EXIChannel[%d]: CS Deselect (command: 0x%02x)", card_index, command);
 		switch (command)
 		{
 		case cmdSectorErase:
