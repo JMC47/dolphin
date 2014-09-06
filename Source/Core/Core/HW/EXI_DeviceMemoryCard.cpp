@@ -120,7 +120,7 @@ CEXIMemoryCard::CEXIMemoryCard(const int index, bool gciFolder)
 	SetCardFlashID(header, card_index);
 
 	tSHSL = SystemTimers::GetTicksPerSecond() * 100ULL / 1000000000ULL;
-	tPP = SystemTimers::GetTicksPerSecond() * 1400ULL / 1000000ULL;
+	tPP = SystemTimers::GetTicksPerSecond() * 1350ULL / 1000000ULL;
 	tSE = SystemTimers::GetTicksPerSecond() * 60ULL / 1000ULL;
 
 	WARN_LOG(EXPANSIONINTERFACE, "EXIChannel[%d]: Timing Information (tSHSL: %llu, tPP: %llu, tSE: %llu)", card_index, tSHSL, tPP, tSE);
@@ -301,7 +301,7 @@ void CEXIMemoryCard::SetCS(int cs)
 			{
 				int count = m_uPosition - 5;
 				int i=0;
-				status |= MC_STATUS_BUSY;
+				//status |= MC_STATUS_BUSY;
 				//status &= ~MC_STATUS_READY;
 
 				while (count--)
