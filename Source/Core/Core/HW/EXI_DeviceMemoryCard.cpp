@@ -258,11 +258,12 @@ void CEXIMemoryCard::CmdDoneLater(u64 cycles)
 	WARN_LOG(EXPANSIONINTERFACE, "EXIChannel[%d]: CmdDoneLater (cycles: %llu)", card_index, cycles);
 	CoreTiming::RemoveEvent(et_cmd_done);
 	CoreTiming::ScheduleEvent(static_cast<int>(cycles), et_cmd_done, static_cast<u64>(card_index));
+	CoreTiming::ForceExceptionCheck(static_cast<int>(cycles));
 }
 
 void CEXIMemoryCard::SetCS(int cs)
 {
-	if (cs)  // not-selected to selected
+	if (cs && status & MC_STATUS_READY)  // not-selected to selected
 	{
 		m_uPosition = 0;
 		WARN_LOG(EXPANSIONINTERFACE, "EXIChannel[%d]: CS Select", card_index);
@@ -296,11 +297,15 @@ void CEXIMemoryCard::SetCS(int cs)
 			break;
 
 		case cmdPageProgram:
+			if (status & MC_STATUS_BUSY)
+				return;
+
 			if (m_uPosition >= 5)
 			{
 				int count = m_uPosition - 5;
 				int i=0;
-				status &= ~MC_STATUS_BUSY;
+				//status |= MC_STATUS_BUSY;
+				//status &= ~MC_STATUS_READY;
 
 				while (count--)
 				{
