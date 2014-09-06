@@ -121,7 +121,7 @@ CEXIMemoryCard::CEXIMemoryCard(const int index, bool gciFolder)
 
 	tSHSL = SystemTimers::GetTicksPerSecond() * 100ULL / 1000000000ULL;
 	tPP = SystemTimers::GetTicksPerSecond() * 1400ULL / 1000000ULL;
-	tSE = SystemTimers::GetTicksPerSecond() * 90ULL / 1000ULL;
+	tSE = SystemTimers::GetTicksPerSecond() * 60ULL / 1000ULL;
 
 	WARN_LOG(EXPANSIONINTERFACE, "EXIChannel[%d]: Timing Information (tSHSL: %llu, tPP: %llu, tSE: %llu)", card_index, tSHSL, tPP, tSE);
 }
@@ -258,12 +258,12 @@ void CEXIMemoryCard::CmdDoneLater(u64 cycles)
 	WARN_LOG(EXPANSIONINTERFACE, "EXIChannel[%d]: CmdDoneLater (cycles: %llu)", card_index, cycles);
 	CoreTiming::RemoveEvent(et_cmd_done);
 	CoreTiming::ScheduleEvent(static_cast<int>(cycles), et_cmd_done, static_cast<u64>(card_index));
-	CoreTiming::ForceExceptionCheck(static_cast<int>(cycles));
+	//CoreTiming::ForceExceptionCheck(static_cast<int>(cycles));
 }
 
 void CEXIMemoryCard::SetCS(int cs)
 {
-	if (cs && status & MC_STATUS_READY)  // not-selected to selected
+	if (cs && (status & MC_STATUS_READY))  // not-selected to selected
 	{
 		m_uPosition = 0;
 		WARN_LOG(EXPANSIONINTERFACE, "EXIChannel[%d]: CS Select", card_index);
@@ -274,7 +274,7 @@ void CEXIMemoryCard::SetCS(int cs)
 		switch (command)
 		{
 		case cmdSectorErase:
-			if (m_uPosition > 2)
+			if (m_uPosition > 2 && (status & MC_STATUS_READY))
 			{
 				memorycard->ClearBlock(address & (memory_card_size - 1));
 				status |= MC_STATUS_BUSY;
@@ -297,10 +297,7 @@ void CEXIMemoryCard::SetCS(int cs)
 			break;
 
 		case cmdPageProgram:
-			if (status & MC_STATUS_BUSY)
-				return;
-
-			if (m_uPosition >= 5)
+			if (m_uPosition >= 5 && !(status & MC_STATUS_BUSY))
 			{
 				int count = m_uPosition - 5;
 				int i=0;
