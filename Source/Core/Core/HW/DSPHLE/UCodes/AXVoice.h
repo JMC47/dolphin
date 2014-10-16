@@ -428,8 +428,11 @@ void MixAdd(int* out, const s16* input, u32 count, u16* pvol, s16* dpop, bool ra
 	for (u32 i = 0; i < count; ++i)
 	{
 		s64 sample = input[i];
-		sample *= volume;
-		sample >>= 15;
+		if (volume < 0x8000)
+		{
+			sample *= volume;
+			sample >>= 15;
+		}
 
 		out[i] += (s16)sample;
 		volume += volume_delta;
@@ -462,7 +465,11 @@ void ProcessVoice(PB_TYPE& pb, const AXBuffers& buffers, u16 count, AXMixControl
 	// Apply a global volume ramp using the volume envelope parameters.
 	for (u32 i = 0; i < count; ++i)
 	{
-		samples[i] = ((s32)samples[i] * pb.vol_env.cur_volume) >> 15;
+		// Rune Factory Frontier (opening movie): cur_volume = 65380
+		if (pb.vol_env.cur_volume < 0x8000)
+		{
+			samples[i] = ((s32)samples[i] * pb.vol_env.cur_volume) >> 15;
+		}
 		pb.vol_env.cur_volume += pb.vol_env.cur_volume_delta;
 	}
 
