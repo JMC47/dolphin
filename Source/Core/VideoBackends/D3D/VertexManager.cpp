@@ -3,6 +3,7 @@
 // Refer to the license.txt file included.
 
 #include "VideoBackends/D3D/D3DBase.h"
+#include "VideoBackends/D3D/GeometryShaderCache.h"
 #include "VideoBackends/D3D/PixelShaderCache.h"
 #include "VideoBackends/D3D/Render.h"
 #include "VideoBackends/D3D/VertexManager.h"
