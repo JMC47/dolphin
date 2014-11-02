@@ -64,5 +64,3 @@ typedef ShaderCode VertexShaderCode; // TODO: Obsolete..
 
 void GetVertexShaderUid(VertexShaderUid& object, u32 components, API_TYPE api_type);
 void GenerateVertexShaderCode(VertexShaderCode& object, u32 components, API_TYPE api_type);
-void GenerateVSOutputStruct(ShaderCode& object, API_TYPE api_type);
-void GenerateVSOutputStruct(ShaderGeneratorInterface& object, API_TYPE api_type);

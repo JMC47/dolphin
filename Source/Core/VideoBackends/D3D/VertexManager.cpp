@@ -208,6 +208,14 @@ void VertexManager::vFlush(bool useDstAlpha)
 		return;
 	}
 
+	if (g_ActiveConfig.iStereoMode > 0)
+	{
+		if (!GeometryShaderCache::SetShader(components))
+		{
+			GFX_DEBUGGER_PAUSE_LOG_AT(NEXT_ERROR,true,{printf("Fail to set pixel shader\n");});
+		}
+	}
+
 	u32 stride = VertexLoaderManager::GetCurrentVertexFormat()->GetVertexStride();
 
 	PrepareDrawBuffers(stride);
