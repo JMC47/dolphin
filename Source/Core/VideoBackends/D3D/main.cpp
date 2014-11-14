@@ -80,7 +80,6 @@ void InitBackendInfo()
 	g_Config.backend_info.bSupportsOversizedViewports = false;
 	g_Config.backend_info.bSupportsStereoscopy = true;
 	g_Config.backend_info.bSupports3DVision = true;
-	g_Config.backend_info.bSupportsGSInstancing = false;
 
 	IDXGIFactory* factory;
 	IDXGIAdapter* ad;
@@ -115,8 +114,13 @@ void InitBackendInfo()
 				g_Config.backend_info.AAModes.push_back(samples);
 			}
 
+			D3D_FEATURE_LEVEL feat_level = DX11::D3D::GetFeatureLevel(ad);
+
 			// Requires the earlydepthstencil attribute (only available in shader model 5)
-			g_Config.backend_info.bSupportsEarlyZ = (DX11::D3D::GetFeatureLevel(ad) == D3D_FEATURE_LEVEL_11_0);
+			g_Config.backend_info.bSupportsEarlyZ = (feat_level == D3D_FEATURE_LEVEL_11_0);
+
+			// Requires the instance attribute (only available in shader model 5)
+			g_Config.backend_info.bSupportsGSInstancing = (feat_level == D3D_FEATURE_LEVEL_11_0);
 		}
 
 		g_Config.backend_info.Adapters.push_back(UTF16ToUTF8(desc.Description));
