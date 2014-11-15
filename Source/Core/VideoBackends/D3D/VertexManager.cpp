@@ -137,9 +137,12 @@ void VertexManager::Draw(u32 stride)
 
 	if (current_primitive_type == PRIMITIVE_TRIANGLES)
 	{
+		D3D::context->GSSetConstantBuffers(0, 1, &VertexShaderCache::GetConstantBuffer());
+		D3D::context->GSSetShader(g_ActiveConfig.iStereoMode > 0 ? GeometryShaderCache::GetActiveShader() : nullptr, nullptr, 0);
 		D3D::context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 		D3D::context->DrawIndexed(indices, startIndex, baseVertex);
 		INCSTAT(stats.thisFrame.numDrawCalls);
+		D3D::context->GSSetShader(nullptr, nullptr, 0);
 	}
 	else if (current_primitive_type == PRIMITIVE_LINES)
 	{
@@ -160,9 +163,8 @@ void VertexManager::Draw(u32 stride)
 			D3D::context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
 			D3D::context->DrawIndexed(indices, startIndex, baseVertex);
 			INCSTAT(stats.thisFrame.numDrawCalls);
-
-			D3D::context->GSSetShader(nullptr, nullptr, 0);
 			((DX11::Renderer*)g_renderer)->RestoreCull();
+			D3D::context->GSSetShader(nullptr, nullptr, 0);
 		}
 	}
 	else //if (current_primitive_type == PRIMITIVE_POINTS)
@@ -184,9 +186,8 @@ void VertexManager::Draw(u32 stride)
 			D3D::context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
 			D3D::context->DrawIndexed(indices, startIndex, baseVertex);
 			INCSTAT(stats.thisFrame.numDrawCalls);
-
-			D3D::context->GSSetShader(nullptr, nullptr, 0);
 			((DX11::Renderer*)g_renderer)->RestoreCull();
+			D3D::context->GSSetShader(nullptr, nullptr, 0);
 		}
 	}
 }
@@ -213,6 +214,7 @@ void VertexManager::vFlush(bool useDstAlpha)
 		if (!GeometryShaderCache::SetShader(components))
 		{
 			GFX_DEBUGGER_PAUSE_LOG_AT(NEXT_ERROR,true,{printf("Fail to set pixel shader\n");});
+			return;
 		}
 	}
 
