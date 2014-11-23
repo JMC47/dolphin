@@ -10,6 +10,7 @@
 #include "VideoBackends/D3D/D3DShader.h"
 #include "VideoBackends/D3D/D3DState.h"
 #include "VideoBackends/D3D/D3DUtil.h"
+#include "VideoBackends/D3D/GeometryShaderCache.h"
 #include "VideoBackends/D3D/PixelShaderCache.h"
 #include "VideoBackends/D3D/VertexShaderCache.h"
 
@@ -553,6 +554,7 @@ void drawShadedTexQuad(ID3D11ShaderResourceView* texture,
 	D3D::context->PSSetShader(PShader, nullptr, 0);
 	D3D::context->PSSetShaderResources(0, 1, &texture);
 	D3D::context->VSSetShader(Vshader, nullptr, 0);
+	D3D::context->GSSetShader(nullptr, nullptr, 0);
 	D3D::stateman->Apply();
 	D3D::context->Draw(4, stq_offset);
 
@@ -614,6 +616,7 @@ void drawShadedTexSubQuad(ID3D11ShaderResourceView* texture,
 	context->PSSetShaderResources(0, 1, &texture);
 	context->PSSetShader(PShader, nullptr, 0);
 	context->VSSetShader(Vshader, nullptr, 0);
+	context->GSSetShader(nullptr, nullptr, 0);
 	stateman->Apply();
 	context->Draw(4, stsq_offset);
 
@@ -648,6 +651,7 @@ void drawColorQuad(u32 Color, float x1, float y1, float x2, float y2)
 	}
 
 	context->VSSetShader(VertexShaderCache::GetClearVertexShader(), nullptr, 0);
+	context->GSSetShader(GeometryShaderCache::GetClearGeometryShader(), nullptr, 0);
 	context->PSSetShader(PixelShaderCache::GetClearProgram(), nullptr, 0);
 	context->IASetInputLayout(VertexShaderCache::GetClearInputLayout());
 
@@ -658,9 +662,11 @@ void drawColorQuad(u32 Color, float x1, float y1, float x2, float y2)
 
 	stateman->Apply();
 	context->Draw(4, cq_offset);
+
+	context->GSSetShader(nullptr, nullptr, 0);
 }
 
-void drawClearQuad(u32 Color, float z, ID3D11PixelShader* PShader, ID3D11VertexShader* Vshader, ID3D11InputLayout* layout)
+void drawClearQuad(u32 Color, float z)
 {
 	ClearVertex coords[4] = {
 		{-1.0f,  1.0f, z, Color},
@@ -677,16 +683,22 @@ void drawClearQuad(u32 Color, float z, ID3D11PixelShader* PShader, ID3D11VertexS
 		clear_quad_data.col = Color;
 		clear_quad_data.z = z;
 	}
-	context->VSSetShader(Vshader, nullptr, 0);
-	context->PSSetShader(PShader, nullptr, 0);
-	context->IASetInputLayout(layout);
+	context->VSSetShader(VertexShaderCache::GetClearVertexShader(), nullptr, 0);
+	if (g_ActiveConfig.iStereoMode > 0)
+		context->GSSetShader(GeometryShaderCache::GetClearGeometryShader(), nullptr, 0);
+	context->PSSetShader(PixelShaderCache::GetClearProgram(), nullptr, 0);
+	context->IASetInputLayout(VertexShaderCache::GetClearInputLayout());
 
 	UINT stride = sizeof(ClearVertex);
 	UINT offset = 0;
 	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 	context->IASetVertexBuffers(0, 1, &util_vbuf->GetBuffer(), &stride, &offset);
+
 	stateman->Apply();
 	context->Draw(4, clearq_offset);
+
+	if (g_ActiveConfig.iStereoMode > 0)
+		context->GSSetShader(nullptr, nullptr, 0);
 }
 
 }  // namespace D3D
