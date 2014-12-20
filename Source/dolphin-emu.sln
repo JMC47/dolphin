@@ -60,6 +60,9 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Video Backends", "Video Backends", "{AAD1BCD6-9804-44A5-A5FC-4782EA00E9D4}"
 EndProject
 Global
+	GlobalSection(CodealikeProperties) = postSolution
+		SolutionGuid = 6fa5facc-e09c-4d01-95e1-624497ef5ec4
+	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
 		Debug|x64 = Debug|x64
