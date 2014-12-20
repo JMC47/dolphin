@@ -248,7 +248,14 @@ void Interpreter::fnegx(UGeckoInstruction _inst)
 
 void Interpreter::fselx(UGeckoInstruction _inst)
 {
+	//double a, b, c,d;
+	//a = rPS0(_inst.FA);
+	//b = rPS0(_inst.FB);
+	//c = rPS0(_inst.FC);
 	rPS0(_inst.FD) = (rPS0(_inst.FA) >= -0.0) ? rPS0(_inst.FC) : rPS0(_inst.FB);
+	//d = rPS0(_inst.FD);
+	//NOTICE_LOG(VIDEO,"%lf = fsel(%lf %lf %lf)",d,a,b,c );
+
 	// This is a binary instruction. Does not alter FPSCR
 	if (_inst.Rc) Helper_UpdateCR1();
 }
