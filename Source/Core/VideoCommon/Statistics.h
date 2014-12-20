@@ -76,7 +76,7 @@ struct Statistics
 
 extern Statistics stats;
 
-#define STATISTICS
+//#define STATISTICS
 
 #ifdef STATISTICS
 #define INCSTAT(a) (a)++;
@@ -89,4 +89,6 @@ extern Statistics stats;
 #define INCSTAT(a) ;
 #define ADDSTAT(a,b) ;
 #define SETSTAT(a,x) ;
+#define SETSTAT_UINT(a,x) ;
+#define SETSTAT_FT(a,x) ;
 #endif
