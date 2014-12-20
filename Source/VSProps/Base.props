@@ -3,9 +3,11 @@
   <ImportGroup Label="PropertySheets" />
   <PropertyGroup Label="UserMacros">
     <DolphinRelease Condition="'$(DolphinRelease)'!='true' or '$(Configuration)'!='Release'">false</DolphinRelease>
+    <DolphinRelease Condition="'$(Configuration)'=='Release'">false</DolphinRelease>
     <TargetSuffix>
     </TargetSuffix>
     <TargetSuffix Condition="'$(Configuration)'=='Debug'">D</TargetSuffix>
+    <TargetSuffix Condition="'$(DolphinRelease)'=='true'">LTCG</TargetSuffix>
     <BuildRootDir>$(SolutionDir)..\Build\</BuildRootDir>
     <BinaryRootDir>$(SolutionDir)..\Binary\</BinaryRootDir>
     <BinaryOutputDir>$(BinaryRootDir)$(Platform)\</BinaryOutputDir>
