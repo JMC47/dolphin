@@ -118,7 +118,7 @@ void GenericLog(LOGTYPES_LEVELS level, LOGTYPES_TYPE type,
 	if (!(_a_)) {\
 		ERROR_LOG(_t_, "Error...\n\n  Line: %d\n  File: %s\n  Time: %s\n\nIgnore and continue?", \
 					   __LINE__, __FILE__, __TIME__); \
-		if (!PanicYesNo("*** Assertion (see log)***\n")) {Crash();} \
+		if (!PanicYesNo("Assertion (see log) : \n" #_a_ "\n")) {Crash();} \
 	}
 #define _dbg_assert_msg_(_t_, _a_, ...)\
 	if (!(_a_)) {\
