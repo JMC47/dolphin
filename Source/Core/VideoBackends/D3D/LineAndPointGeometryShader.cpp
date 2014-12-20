@@ -228,7 +228,7 @@ bool LineAndPointGeometryShader::SetLineShader(u32 components, float lineWidth,
 			      lineWidth, texOffset, vpWidth, vpHeight);
 
 	D3D::context->GSSetShader(shader, nullptr, 0);
-	auto paramBuffer = paramsBuffer_.get();
+	ID3D11Buffer* paramBuffer = paramsBuffer_.get();
 	D3D::context->GSSetConstantBuffers(0, 1, &paramBuffer);
 	return true;
 }
@@ -249,7 +249,7 @@ bool LineAndPointGeometryShader::SetPointShader(u32 components, float pointSize,
 			      pointSize, texOffset, vpWidth, vpHeight);
 
 	D3D::context->GSSetShader(shader, nullptr, 0);
-	auto paramBuffer = paramsBuffer_.get();
+	ID3D11Buffer* paramBuffer = paramsBuffer_.get();
 	D3D::context->GSSetConstantBuffers(0, 1, &paramBuffer);
 	
 	return true;
