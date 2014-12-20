@@ -4,6 +4,7 @@
 
 #include <algorithm>
 
+#include <unordered_set>
 #include "Common/FileUtil.h"
 #include "Common/MemoryUtil.h"
 
@@ -24,6 +25,8 @@ enum
 {
 	TEXTURE_KILL_THRESHOLD = 200,
 };
+
+std::unordered_set<u64> done;
 
 TextureCache *g_texture_cache;
 
@@ -86,6 +89,7 @@ void TextureCache::Invalidate()
 
 TextureCache::~TextureCache()
 {
+	done.clear();
 	Invalidate();
 	FreeAlignedMemory(temp);
 	temp = nullptr;
@@ -299,18 +303,20 @@ PC_TexFormat TextureCache::LoadCustomTexture(u64 tex_hash, int texformat, unsign
 	return ret;
 }
 
+
 void TextureCache::DumpTexture(TCacheEntryBase* entry, unsigned int level)
 {
+	if( done.find( (entry->hash & 0x00000000FFFFFFFFLL)| (u64(level)<<32ull) | (u64(entry->format & 0xFFFF)<<48ull) ) 
+			!= done.end() ) {
+		return;
+	}
+	done.insert( (entry->hash & 0x00000000FFFFFFFFLL)| (u64(level)<<32ull) | (u64(entry->format & 0xFFFF)<<48ull) );
 	std::string filename;
 	std::string szDir = File::GetUserPath(D_DUMPTEXTURES_IDX) +
-		SConfig::GetInstance().m_LocalCoreStartupParameter.m_strUniqueID;
-
-	// make sure that the directory exists
-	if (!File::Exists(szDir) || !File::IsDirectory(szDir))
-		File::CreateDir(szDir);
+		SConfig::GetInstance().m_LocalCoreStartupParameter.m_strUniqueID + (level != 0 ? "/mips" : "") ;
 
 	// For compatibility with old texture packs, don't print the LOD index for level 0.
-	 // TODO: TLUT format should actually be stored in filename? :/
+	// TODO: TLUT format should actually be stored in filename? :/
 	if (level == 0)
 	{
 		filename = StringFromFormat("%s/%s_%08x_%i.png", szDir.c_str(),
