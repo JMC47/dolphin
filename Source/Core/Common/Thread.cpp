@@ -15,8 +15,14 @@
 #include <process.h>
 #endif
 
+bool g_skipYield{true};
 namespace Common
 {
+	void YieldCPU()
+	{
+		if (!g_skipYield)
+			std::this_thread::yield();
+	}
 
 int CurrentThreadId()
 {
