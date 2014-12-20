@@ -36,7 +36,7 @@ class WrapDeviceContext {
 		ID3D11RasterizerState *  rasterizerState_{};
 
 		ID3D11BlendState *       blendState_{};
-		std::array<FLOAT,4>      blendFactor_ { std::array<FLOAT,4>{ 1, 1, 1, 1} }; // VS2013 miss non static aggregate member c++11
+		std::array<FLOAT,4>      blendFactor_ = std::array<FLOAT,4>{ (1, 1, 1, 1) }; // VS2013 miss non static aggregate member c++11
 		UINT                     sampleMask_=0xffffffffu;
 
 		ID3D11DepthStencilState * depthStencilState_{};
