@@ -199,6 +199,9 @@ void Jit64::fsign(UGeckoInstruction inst)
 
 void Jit64::fselx(UGeckoInstruction inst)
 {
+	FallBackToInterpreter(inst);
+	return;
+
 	INSTRUCTION_START
 	JITDISABLE(bJITFloatingPointOff)
 
@@ -215,12 +218,14 @@ void Jit64::fselx(UGeckoInstruction inst)
 
 	fpr.Lock(a, b, c, d);
 	MOVSD(XMM0, fpr.R(a));
+	PXOR(XMM0, M((void*)&psSignBits2));
+	
 	PXOR(XMM1, R(XMM1));
 	// XMM0 = XMM0 < 0 ? all 1s : all 0s
-	CMPSD(XMM0, R(XMM1), LT);
+	CMPSD(XMM0, R(XMM1), NLT);
 	MOVSD(XMM1, R(XMM0));
-	PAND(XMM0, fpr.R(b));
-	PANDN(XMM1, fpr.R(c));
+	PAND(XMM0, fpr.R(c));
+	PANDN(XMM1, fpr.R(b));
 	POR(XMM0, R(XMM1));
 	fpr.BindToRegister(d, false);
 	MOVSD(fpr.RX(d), R(XMM0));
