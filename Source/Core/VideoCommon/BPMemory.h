@@ -1080,6 +1080,7 @@ struct BPMemory
 #pragma pack()
 
 extern BPMemory bpmem;
+static_assert(sizeof(BPMemory) == sizeof(u32)*256,"bp memory invalid size");
 
 void LoadBPReg(u32 value0);
 
