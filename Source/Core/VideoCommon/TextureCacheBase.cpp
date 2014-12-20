@@ -54,6 +54,20 @@ TextureCache::TextureCache()
 	SetHash64Function(g_ActiveConfig.bHiresTextures || g_ActiveConfig.bDumpTextures);
 
 	invalidate_texture_cache_requested = false;
+
+	std::string szDir = File::GetUserPath(D_DUMPTEXTURES_IDX) + SConfig::GetInstance().m_LocalCoreStartupParameter.m_strUniqueID;
+
+	// make sure that the directory exists
+	if (!File::Exists(szDir) || !File::IsDirectory(szDir))
+		File::CreateDir(szDir);
+
+	szDir = File::GetUserPath(D_DUMPTEXTURES_IDX) + SConfig::GetInstance().m_LocalCoreStartupParameter.m_strUniqueID + "/mips";
+
+	// make sure that the directory exists
+	if (!File::Exists(szDir) || !File::IsDirectory(szDir))
+		File::CreateDir(szDir);
+
+
 }
 
 void TextureCache::RequestInvalidateTextureCache()
