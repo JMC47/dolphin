@@ -202,6 +202,21 @@ bool Renderer::CalculateTargetSize(unsigned int framebuffer_width, unsigned int 
 			efb_scale_denominatorX = efb_scale_denominatorY = 1;
 			break;
 
+			case 8: // 4x
+			efb_scale_numeratorX = efb_scale_numeratorY = 5;
+			efb_scale_denominatorX = efb_scale_denominatorY = 1;
+			break;
+
+			case 9: // 4x
+			efb_scale_numeratorX = efb_scale_numeratorY = 6;
+			efb_scale_denominatorX = efb_scale_denominatorY = 1;
+			break;
+
+			case 10: // 4x
+			efb_scale_numeratorX = efb_scale_numeratorY = 7;
+			efb_scale_denominatorX = efb_scale_denominatorY = 1;
+			break;
+
 		default: // fractional & integral handled later
 			break;
 	}

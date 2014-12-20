@@ -913,7 +913,7 @@ void CFrame::OnKeyDown(wxKeyEvent& event)
 		{
 			OSDChoice = 1;
 			// Toggle native resolution
-			if (++g_Config.iEFBScale > SCALE_4X)
+			if (++g_Config.iEFBScale > SCALE_7X)
 				g_Config.iEFBScale = SCALE_AUTO;
 		}
 		else if (IsHotkey(event, HK_TOGGLE_AR))
