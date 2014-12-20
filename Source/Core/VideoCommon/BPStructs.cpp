@@ -566,9 +566,11 @@ static void BPWritten(const BPCmd& bp)
 			// don't compare with changes!
 			int num = (bp.address >> 1) & 0x3;
 			if ((bp.address & 1) == 0)
-				PixelShaderManager::SetColorChanged(bpmem.tevregs[num].type_ra, num);
+				PixelShaderManager::SetColorChangedRA(bpmem.tevregs[num].type_ra, num);
+				//PixelShaderManager::SetColorChanged(bpmem.tevregs[num].type_ra, num);
 			else
-				PixelShaderManager::SetColorChanged(bpmem.tevregs[num].type_bg, num);
+				PixelShaderManager::SetColorChangedBG(bpmem.tevregs[num].type_bg, num);
+				//PixelShaderManager::SetColorChanged(bpmem.tevregs[num].type_bg, num);
 		}
 		return;
 	default:
