@@ -15,6 +15,8 @@
 #include "VideoCommon/TextureDecoder.h"
 #include "VideoCommon/VideoCommon.h"
 
+#include <array>
+#include <unordered_map>
 
 void InitBPMemory()
 {
