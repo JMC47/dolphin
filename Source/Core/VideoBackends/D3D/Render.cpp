@@ -59,9 +59,9 @@ static ID3D11Texture2D* s_screenshot_texture = nullptr;
 struct
 {
 	D3D11_SAMPLER_DESC sampdc[8];
-	D3D11_BLEND_DESC blenddc;
+	D3D::PackedD3DBlendDesc blenddc;
 	D3D11_DEPTH_STENCIL_DESC depthdc;
-	D3D11_RASTERIZER_DESC rastdc;
+	D3D::PackedD3DRasterisationDesc rastdc;
 } gx_state;
 
 
@@ -324,6 +324,22 @@ void Renderer::SetColorMask()
 	}
 	gx_state.blenddc.RenderTarget[0].RenderTargetWriteMask = color_mask;
 }
+
+// EFB cache related
+static const u32 EFB_CACHE_RECT_SIZE = 64; // Cache 64x64 blocks.
+static const u32 EFB_CACHE_WIDTH = (EFB_WIDTH + EFB_CACHE_RECT_SIZE - 1) / EFB_CACHE_RECT_SIZE; // round up
+static const u32 EFB_CACHE_HEIGHT = (EFB_HEIGHT + EFB_CACHE_RECT_SIZE - 1) / EFB_CACHE_RECT_SIZE;
+
+union ColorAndDepth{
+	BitField< 0,4,u8> color_;
+	BitField< 4,4,u8> depth_;
+	u8 raw_;
+};
+static_assert(sizeof(ColorAndDepth)==1,"ColorAndDepth must be 8 bits");
+std::array<ColorAndDepth, EFB_CACHE_WIDTH * EFB_CACHE_HEIGHT> s_efbCacheValid{};
+
+static std::vector<float> s_depthEfbCache(EFB_CACHE_WIDTH * EFB_CACHE_HEIGHT); // 2 for PEEK_Z and PEEK_COLOR
+static std::vector<u32> s_colorEfbCache(EFB_CACHE_WIDTH * EFB_CACHE_HEIGHT); // 2 for PEEK_Z and PEEK_COLOR
 
 // This function allows the CPU to directly access the EFB.
 // There are EFB peeks (which will read the color or depth of a pixel)
@@ -753,6 +769,7 @@ void formatBufferDump(const u8* in, u8* out, int w, int h, int p)
 // This function has the final picture. We adjust the aspect ratio here.
 void Renderer::SwapImpl(u32 xfbAddr, u32 fbWidth, u32 fbHeight,const EFBRectangle& rc,float Gamma)
 {
+	//NOTICE_LOG(VIDEO,"PRESENT");
 	if (g_bSkipCurrentFrame || (!XFBWrited && !g_ActiveConfig.RealXFBEnabled()) || !fbWidth || !fbHeight)
 	{
 		if (g_ActiveConfig.bDumpFrames && !frame_data.empty())
@@ -828,7 +845,7 @@ void Renderer::SwapImpl(u32 xfbAddr, u32 fbWidth, u32 fbHeight,const EFBRectangl
 			if (g_ActiveConfig.bUseRealXFB)
 			{
 				drawRc.top = 1;
-				drawRc.bottom = -1;
+				drawRc.bottom = -1; 
 				drawRc.left = -1;
 				drawRc.right = 1;
 			}
@@ -1109,7 +1126,7 @@ void Renderer::RestoreState() {
 
 void Renderer::ApplyCullDisable()
 {
-	D3D11_RASTERIZER_DESC rastDesc = gx_state.rastdc;
+	auto rastDesc = gx_state.rastdc;
 	rastDesc.CullMode = D3D11_CULL_NONE;
 	D3D::stateman->PushRasterizerState(D3D::GetRasterizerState(rastDesc));
 	D3D::stateman->Apply();
@@ -1260,15 +1277,41 @@ void Renderer::SetLogicOpMode()
 		D3D11_BLEND_ONE//15
 	};
 
+	const D3D11_LOGIC_OP d3dLogicOp[16] =
+	{
+		D3D11_LOGIC_OP_CLEAR,
+		D3D11_LOGIC_OP_AND,
+		D3D11_LOGIC_OP_AND_REVERSE,
+		D3D11_LOGIC_OP_COPY,
+		D3D11_LOGIC_OP_AND_INVERTED,
+		D3D11_LOGIC_OP_NOOP,
+		D3D11_LOGIC_OP_XOR,
+		D3D11_LOGIC_OP_OR,
+		D3D11_LOGIC_OP_NOR,
+		D3D11_LOGIC_OP_EQUIV,
+		D3D11_LOGIC_OP_INVERT,
+		D3D11_LOGIC_OP_OR_REVERSE,
+		D3D11_LOGIC_OP_COPY_INVERTED,
+		D3D11_LOGIC_OP_OR_INVERTED,
+		D3D11_LOGIC_OP_NAND,
+		D3D11_LOGIC_OP_SET
+	};
+
 	if (bpmem.blendmode.logicopenable)
 	{
+		
 		gx_state.blenddc.RenderTarget[0].BlendEnable = true;
 		SetBlendOp(d3dLogicOps[bpmem.blendmode.logicmode]);
 		SetSrcBlend(d3dLogicOpSrcFactors[bpmem.blendmode.logicmode]);
 		SetDestBlend(d3dLogicOpDestFactors[bpmem.blendmode.logicmode]);
+		
+		//g_Config.backend_info.bSupportsLogicOp
+		//gx_state.blenddc.LogicOpEnable = TRUE;
+		//gx_state.blenddc.LogicOp = d3dLogicOp[bpmem.blendmode.logicmode];
 	}
 	else
 	{
+		gx_state.blenddc.LogicOpEnable = FALSE;
 		SetBlendMode(true);
 	}
 }

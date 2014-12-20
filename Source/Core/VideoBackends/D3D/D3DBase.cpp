@@ -4,8 +4,13 @@
 
 #include <unordered_map>
 
+//#include <Initguid.h>
+//#include <DXGIDebug.h>
+
+#include "Common/CPUDetect.h"
 #include "Common/Hash.h"
 #include "Common/StringUtil.h"
+#include "VideoBackends/D3D/D3DPtr.h"
 #include "VideoBackends/D3D/D3DBase.h"
 #include "VideoBackends/D3D/D3DTexture.h"
 #include "VideoBackends/D3D/GfxState.h"
@@ -20,7 +25,9 @@ pD3DCompile PD3DCompile = nullptr;
 int d3dcompiler_dll_ref = 0;
 
 CREATEDXGIFACTORY PCreateDXGIFactory = nullptr;
+DXGIGETDEBUGINTERFACE PDXGIGetDebugInterface {};
 HINSTANCE hDXGIDll = nullptr;
+HINSTANCE hDXGIDebugDll = nullptr;
 int dxgi_dll_ref = 0;
 
 typedef HRESULT (WINAPI* D3D11CREATEDEVICEANDSWAPCHAIN)(IDXGIAdapter*, D3D_DRIVER_TYPE, HMODULE, UINT, CONST D3D_FEATURE_LEVEL*, UINT, UINT, CONST DXGI_SWAP_CHAIN_DESC*, IDXGISwapChain**, ID3D11Device**, D3D_FEATURE_LEVEL*, ID3D11DeviceContext**);
@@ -33,6 +40,7 @@ namespace D3D
 {
 
 ID3D11Device* device = nullptr;
+ID3D11Device1* device1 = nullptr;
 WrapDeviceContext context;
 IDXGISwapChain* swapchain = nullptr;
 D3D_FEATURE_LEVEL featlevel;
@@ -59,6 +67,7 @@ HRESULT LoadDXGI()
 	if (dxgi_dll_ref++ > 0) return S_OK;
 
 	if (hDXGIDll) return S_OK;
+
 	hDXGIDll = LoadLibraryA("dxgi.dll");
 	if (!hDXGIDll)
 	{
@@ -68,6 +77,17 @@ HRESULT LoadDXGI()
 	}
 	PCreateDXGIFactory = (CREATEDXGIFACTORY)GetProcAddress(hDXGIDll, "CreateDXGIFactory");
 	if (PCreateDXGIFactory == nullptr) MessageBoxA(nullptr, "GetProcAddress failed for CreateDXGIFactory!", "Critical error", MB_OK | MB_ICONERROR);
+
+	//hDXGIDebugDll = LoadLibraryA("dxgidebug.dll");
+	//if (!hDXGIDebugDll)
+	//{
+	//	MessageBoxA(nullptr, "Failed to load dxgidebug.dll", "Critical error", MB_OK | MB_ICONERROR);
+	//	--dxgi_dll_ref;
+	//	return E_FAIL;
+	//}
+
+	//PDXGIGetDebugInterface = (CREATEDXGIFACTORY)GetProcAddress(hDXGIDebugDll, "DXGIGetDebugInterface");
+	//if (PDXGIGetDebugInterface == nullptr) MessageBoxA(nullptr, "GetProcAddress failed for DXGIGetDebugInterface!", "Critical error", MB_OK | MB_ICONERROR);
 
 	return S_OK;
 }
@@ -132,6 +152,7 @@ void UnloadDXGI()
 	if (hDXGIDll) FreeLibrary(hDXGIDll);
 	hDXGIDll = nullptr;
 	PCreateDXGIFactory = nullptr;
+	PDXGIGetDebugInterface = nullptr;
 }
 
 void UnloadD3D()
@@ -279,7 +300,7 @@ HRESULT Create(HWND wnd)
 	swap_chain_desc.BufferDesc.Width = xres;
 	swap_chain_desc.BufferDesc.Height = yres;
 
-#if defined(_DEBUG) || defined(DEBUGFAST)
+#if defined(_DEBUG) || defined(DEBUGFAST) || 0
 	// Creating debug devices can sometimes fail if the user doesn't have the correct
 	// version of the DirectX SDK. If it does, simply fallback to a non-debug device.
 	{
@@ -312,6 +333,9 @@ HRESULT Create(HWND wnd)
 	SAFE_RELEASE(factory);
 	SAFE_RELEASE(output);
 	SAFE_RELEASE(adapter);
+
+	//device->QueryInterface( __uuidof(ID3D11Device1), (void**)&device1);
+	//context->InitContext1();
 
 	ID3D11Texture2D* buf;
 	hr = swapchain->GetBuffer(0, IID_ID3D11Texture2D, (void**)&buf);
@@ -353,6 +377,7 @@ void Close()
 
 	ReleaseStates();
 	SAFE_RELEASE(context);
+	
 	ULONG references = device->Release();
 	if (references)
 	{
@@ -363,6 +388,13 @@ void Close()
 		NOTICE_LOG(VIDEO, "Successfully released all device references!");
 	}
 	device = nullptr;
+	
+	//D3D::UniquePtr<IDXGIDebug> debugInterface;
+	//PDXGIGetDebugInterface(__uuidof(IDXGIDebug), ToAddr(debugInterface) );
+	//if (debugInterface) {
+	//	//LPGUID guid = (LPGUID)GetProcAddress(hDXGIDebugDll, "DXGI_DEBUG_ALL");
+	//	debugInterface->ReportLiveObjects(DXGI_DEBUG_ALL,DXGI_DEBUG_RLO_ALL);
+	//}
 
 	// unload DLLs
 	UnloadD3D();
@@ -388,6 +420,13 @@ const char* PixelShaderVersionString()
 	if (featlevel == D3D_FEATURE_LEVEL_11_0) return "ps_5_0";
 	else if (featlevel == D3D_FEATURE_LEVEL_10_1) return "ps_4_1";
 	else /*if(featlevel == D3D_FEATURE_LEVEL_10_0)*/ return "ps_4_0";
+}
+
+const char* ComputeShaderVersionString()
+{
+	if (featlevel == D3D_FEATURE_LEVEL_11_0) return "cs_5_0";
+	else if (featlevel == D3D_FEATURE_LEVEL_10_1) return "cs_4_1";
+	else /*if(featlevel == D3D_FEATURE_LEVEL_10_0)*/ return "cs_4_0";
 }
 
 D3DTexture2D* &GetBackBuffer() { return backbuf; }
@@ -420,81 +459,109 @@ unsigned int GetMaxTextureSize()
 	}
 }
 
-//TODO: Put this in this own file
-std::unordered_map<u64, ID3D11BlendState*> bstates_;
-std::unordered_map<u64, ID3D11SamplerState*> sstates_;
-std::unordered_map<u64, ID3D11RasterizerState*> rstates_;
-std::unordered_map<u64, ID3D11DepthStencilState*> dstates_;
+template <typename T>
+struct HashDesc {
+	std::size_t operator() ( T const & val ) {
+#if _M_SSE >= 0x402
+		if (cpu_info.bSSE4_2) // sse crc32 version
+		{
+			return std::size_t( GetCRC32_CT( val ) );
+		}
+		else
+#endif
+		{
+			return GetMurmurHash3( (u8 const*)&val, sizeof(val), 0 );
+		}
+	}
+};
 
-ID3D11RasterizerState*   GetRasterizerState( D3D11_RASTERIZER_DESC const& desc, char const* debugNameOnCreation ) {
-	auto crc = GetHash64( (u8 const*)&desc, sizeof( desc ), 0 );
+struct PassHash {
+	std::size_t operator()(size_t val) const { return val; }
+};
+
+//TODO: Put this in this own file
+std::unordered_map<std::size_t, D3D::UniquePtr<ID3D11BlendState>,PassHash> bstates_;
+std::unordered_map<std::size_t, D3D::UniquePtr<ID3D11SamplerState>,PassHash> sstates_;
+std::unordered_map<std::size_t, D3D::UniquePtr<ID3D11RasterizerState>,PassHash> rstates_;
+std::unordered_map<std::size_t, D3D::UniquePtr<ID3D11DepthStencilState>,PassHash> dstates_;
+
+ID3D11RasterizerState*   GetRasterizerState( PackedD3DRasterisationDesc const& desc, char const* debugNameOnCreation ) {
+	auto crc = HashDesc<decltype(desc)>{}( desc );
 	auto it = rstates_.find( crc );
 	if ( it != rstates_.end() ) {
-		return it->second;
+		return it->second.get();
 	}
 	ID3D11RasterizerState* state;
-	auto hr = D3D::device->CreateRasterizerState( &desc, &state );
+	auto d3ddesc = desc.Unpack();
+	//d3ddesc.CullMode = D3D11_CULL_NONE;
+	auto hr = D3D::device->CreateRasterizerState( &d3ddesc, &state );
 	if ( FAILED( hr ) ) 
 		PanicAlert( "Failed to create rasterizer state at %s %d\n", __FILE__, __LINE__ );
 	D3D::SetDebugObjectName( state, debugNameOnCreation );
-	rstates_.emplace( crc, state );
+	rstates_.emplace( crc, D3D::UniquePtr<ID3D11RasterizerState>{state} );
 	return state;
 }
 
-ID3D11BlendState*        GetBlendState( D3D11_BLEND_DESC const& desc, char const* debugNameOnCreation ) {
-	auto crc = GetHash64( (u8 const*)&desc, sizeof( desc ), 0 );
+
+
+ID3D11BlendState*        GetBlendState( PackedD3DBlendDesc const& desc, char const* debugNameOnCreation ) {
+	auto crc = HashDesc<decltype(desc)>{}( desc );
 	auto it = bstates_.find( crc );
 	if ( it != bstates_.end() ) {
-		return it->second;
+		return it->second.get();
 	}
 	ID3D11BlendState* state;
-	auto hr = D3D::device->CreateBlendState( &desc, &state );
-	if ( FAILED( hr ) ) 
-		PanicAlert( "Failed to create blend state at %s %d\n", __FILE__, __LINE__ );
-	D3D::SetDebugObjectName( state, debugNameOnCreation );
-	bstates_.emplace( crc, state );
-	return state;
+	if (device1 && desc.LogicOpEnable) {
+		auto d3ddesc = desc.Unpack1();
+		auto hr = D3D::device1->CreateBlendState1( &d3ddesc, (ID3D11BlendState1**)&state );
+		if ( FAILED( hr ) ) 
+			PanicAlert( "Failed to create blend state at %s %d\n", __FILE__, __LINE__ );
+		D3D::SetDebugObjectName( state, debugNameOnCreation );
+		bstates_.emplace( crc, D3D::UniquePtr<ID3D11BlendState>{state} );
+		return state; 
+	} else {
+		auto d3ddesc = desc.Unpack();
+		auto hr = D3D::device->CreateBlendState( &d3ddesc, &state );
+		if ( FAILED( hr ) ) 
+			PanicAlert( "Failed to create blend state at %s %d\n", __FILE__, __LINE__ );
+		D3D::SetDebugObjectName( state, debugNameOnCreation );
+		bstates_.emplace( crc, D3D::UniquePtr<ID3D11BlendState>{state} );
+		return state; 
+	}
+
 }
 
 ID3D11DepthStencilState* GetDepthStencilState( D3D11_DEPTH_STENCIL_DESC const& desc, char const* debugNameOnCreation ) {
-	auto crc = GetHash64( (u8 const*)&desc, sizeof( desc ), 0 );
+	auto crc = HashDesc<decltype(desc)>{}( desc );
 	auto it = dstates_.find( crc );
 	if ( it != dstates_.end() ) {
-		return it->second;
+		return it->second.get();
 	}
 	ID3D11DepthStencilState* state;
 	auto hr = D3D::device->CreateDepthStencilState( &desc, &state );
 	if ( FAILED( hr ) ) 
 		PanicAlert( "Failed to create depth stencil state at %s %d\n", __FILE__, __LINE__ );
 	D3D::SetDebugObjectName( state, debugNameOnCreation );
-	dstates_.emplace( crc, state );
+	dstates_.emplace( crc, D3D::UniquePtr<ID3D11DepthStencilState>{state} );
 	return state;
 }
 
 ID3D11SamplerState*      GetSamplerState( D3D11_SAMPLER_DESC const& desc, char const* debugNameOnCreation ) {
-	auto crc = GetHash64( (u8 const*)&desc, sizeof( desc ), 0 );
+	auto crc = HashDesc<decltype(desc)>{}( desc );
 	auto it = sstates_.find( crc );
 	if ( it != sstates_.end() ) {
-		return it->second;
+		return it->second.get();
 	}
 	ID3D11SamplerState* state;
 	auto hr = D3D::device->CreateSamplerState( &desc, &state );
 	if ( FAILED( hr ) ) 
 		PanicAlert( "Failed to create sampler state at %s %d\n", __FILE__, __LINE__ );
 	D3D::SetDebugObjectName( state, debugNameOnCreation );
-	sstates_.emplace( crc, state );
+	sstates_.emplace( crc, D3D::UniquePtr<ID3D11SamplerState>{state} );
 	return state;
 }
 
 void ReleaseStates() {
-	for( auto & state : sstates_ )
-		state.second->Release();
-	for( auto & state : dstates_ )
-		state.second->Release();
-	for( auto & state : bstates_ )
-		state.second->Release();
-	for( auto & state : rstates_ )
-		state.second->Release();
 	sstates_.clear();
 	dstates_.clear();
 	bstates_.clear();
