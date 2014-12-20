@@ -374,7 +374,7 @@ TextureCache::TCacheEntryBase* TextureCache::Load(unsigned int const stage,
 	u32 full_format = texformat;
 	PC_TexFormat pcfmt = PC_TEX_FMT_NONE;
 
-	const bool isPaletteTexture = (texformat == GX_TF_C4 || texformat == GX_TF_C8 || texformat == GX_TF_C14X2);
+	bool isPaletteTexture = (texformat == GX_TF_C4 || texformat == GX_TF_C8 || texformat == GX_TF_C14X2);
 	if (isPaletteTexture)
 		full_format = texformat | (tlutfmt << 16);
 
@@ -386,13 +386,22 @@ TextureCache::TCacheEntryBase* TextureCache::Load(unsigned int const stage,
 	else
 		src_data = Memory::GetPointer(address);
 
+	auto entIt = textures.find(texID);
+	
+	bool skipHash = false;
+	bool skipPalette = false;
+
+	//if (entIt != textures.end() && entIt->second->IsEfbCopy() && g_ActiveConfig.bCopyEFBToTexture)
+	//	skipPalette = true;
+
+
 	// TODO: This doesn't hash GB tiles for preloaded RGBA8 textures (instead, it's hashing more data from the low tmem bank than it should)
 	tex_hash = GetHash64(src_data, texture_size, g_ActiveConfig.iSafeTextureCache_ColorSamples);
-	if (isPaletteTexture)
+	if (isPaletteTexture && !skipPalette && !skipHash)
 	{
 		const u32 palette_size = TexDecoder_GetPaletteSize(texformat);
 		tlut_hash = GetHash64(&texMem[tlutaddr], palette_size, g_ActiveConfig.iSafeTextureCache_ColorSamples);
-
+		//tlut_hash = 0;
 		// NOTE: For non-paletted textures, texID is equal to the texture address.
 		//       A paletted texture, however, may have multiple texIDs assigned though depending on the currently used tlut.
 		//       This (changing texID depending on the tlut_hash) is a trick to get around
@@ -406,6 +415,7 @@ TextureCache::TCacheEntryBase* TextureCache::Load(unsigned int const stage,
 		tex_hash ^= tlut_hash;
 	}
 
+	//Key key{ }
 	// D3D doesn't like when the specified mipmap count would require more than one 1x1-sized LOD in the mipmap chain
 	// e.g. 64x64 with 7 LODs would have the mipmap chain 64x64,32x32,16x16,8x8,4x4,2x2,1x1,1x1, so we limit the mipmap count to 6 there
 	while (g_ActiveConfig.backend_info.bUseMinimalMipCount && std::max(expandedWidth, expandedHeight) >> maxlevel == 0)
@@ -487,6 +497,8 @@ TextureCache::TCacheEntryBase* TextureCache::Load(unsigned int const stage,
 
 	if (!using_custom_texture)
 	{
+		
+
 		if (!(texformat == GX_TF_RGBA8 && from_tmem))
 		{
 			pcfmt = TexDecoder_Decode(temp, src_data, expandedWidth,
@@ -504,6 +516,8 @@ TextureCache::TCacheEntryBase* TextureCache::Load(unsigned int const stage,
 	// Only load native mips if their dimensions fit to our virtual texture dimensions
 	const bool use_native_mips = use_mipmaps && !using_custom_lods && (width == nativeW && height == nativeH);
 	texLevels = (use_native_mips || using_custom_lods) ? texLevels : 1; // TODO: Should be forced to 1 for non-pow2 textures (e.g. efb copies with automatically adjusted IR)
+
+	//NOTICE_LOG(VIDEO,"RAM2TEX : srcp %p srcfmt %d", address, texformat );
 
 	// create the entry/texture
 	if (nullptr == entry)
@@ -528,11 +542,12 @@ TextureCache::TCacheEntryBase* TextureCache::Load(unsigned int const stage,
 		entry->Load(width, height, expandedWidth, 0);
 	}
 
+
 	entry->SetGeneralParameters(address, texture_size, full_format, entry->num_mipmaps);
 	entry->SetDimensions(nativeW, nativeH, width, height);
 	entry->hash = tex_hash;
 
-	if (entry->IsEfbCopy() && !g_ActiveConfig.bCopyEFBToTexture)
+	if (skipHash || entry->IsEfbCopy() && !g_ActiveConfig.bCopyEFBToTexture)
 		entry->type = TCET_EC_DYNAMIC;
 	else
 		entry->type = TCET_NORMAL;
@@ -568,6 +583,8 @@ TextureCache::TCacheEntryBase* TextureCache::Load(unsigned int const stage,
 					: src_data;
 				TexDecoder_Decode(temp, mip_src_data, expanded_mip_width, expanded_mip_height, texformat, tlutaddr, tlutfmt, g_ActiveConfig.backend_info.bUseRGBATextures);
 				mip_src_data += TexDecoder_GetTextureSizeInBytes(expanded_mip_width, expanded_mip_height, texformat);
+
+				
 
 				entry->Load(mip_width, mip_height, expanded_mip_width, level);
 

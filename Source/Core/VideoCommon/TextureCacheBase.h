@@ -119,6 +119,17 @@ private:
 	static PC_TexFormat LoadCustomTexture(u64 tex_hash, int texformat, unsigned int level, unsigned int& width, unsigned int& height);
 	static void DumpTexture(TCacheEntryBase* entry, unsigned int level);
 
+	struct Key {
+		u32 pixelHash_;
+		u32 lutHash_;
+
+		bool operator<( Key const & o ) const { 
+			if ( pixelHash_ < o.pixelHash_ ) return true;
+			if ( pixelHash_ == o.pixelHash_ ) return lutHash_ == o.lutHash_;
+			return false;
+		}
+	};
+
 	typedef std::map<u32, TCacheEntryBase*> TexCache;
 
 	static TexCache textures;
