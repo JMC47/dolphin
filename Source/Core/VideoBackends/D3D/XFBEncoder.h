@@ -5,6 +5,7 @@
 #pragma once
 
 #include "VideoCommon/VideoCommon.h"
+#include "VideoBackends/D3D/D3DPtr.h"
 
 struct ID3D11Texture2D;
 struct ID3D11RenderTargetView;
@@ -39,9 +40,9 @@ private:
 	ID3D11Texture2D* m_outStage;
 	ID3D11Buffer* m_encodeParams;
 	ID3D11Buffer* m_quad;
-	ID3D11VertexShader* m_vShader;
+	D3D::UniquePtr<ID3D11VertexShader> m_vShader;
 	ID3D11InputLayout* m_quadLayout;
-	ID3D11PixelShader* m_pShader;
+	D3D::UniquePtr<ID3D11PixelShader> m_pShader;
 	ID3D11BlendState* m_xfbEncodeBlendState;
 	ID3D11DepthStencilState* m_xfbEncodeDepthState;
 	ID3D11RasterizerState* m_xfbEncodeRastState;

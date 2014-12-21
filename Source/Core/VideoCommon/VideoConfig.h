@@ -155,6 +155,7 @@ struct VideoConfig final
 		bool bSupportsEarlyZ; // needed by PixelShaderGen, so must stay in VideoCommon
 		bool bSupportsBindingLayout; // Needed by ShaderGen, so must stay in VideoCommon
 		bool bSupportsLogicOp;
+		bool bSupportsShaderModel5;
 	} backend_info;
 
 	// Utility

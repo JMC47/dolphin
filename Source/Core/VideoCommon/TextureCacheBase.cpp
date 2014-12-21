@@ -33,6 +33,8 @@ TextureCache *g_texture_cache;
 GC_ALIGNED16(u8 *TextureCache::temp) = nullptr;
 unsigned int TextureCache::temp_size;
 
+GC_ALIGNED16(u8 const* TextureCache::src_temp) = nullptr;
+unsigned int TextureCache::src_temp_size;
 TextureCache::TexCache TextureCache::textures;
 
 TextureCache::BackupConfig TextureCache::backup_config;
@@ -421,7 +423,7 @@ TextureCache::TCacheEntryBase* TextureCache::Load(unsigned int const stage,
 	while (g_ActiveConfig.backend_info.bUseMinimalMipCount && std::max(expandedWidth, expandedHeight) >> maxlevel == 0)
 		--maxlevel;
 
-	TCacheEntryBase *entry = textures[texID];
+	auto entry = textures[texID];
 	if (entry)
 	{
 		// 1. Calculate reference hash:
@@ -494,7 +496,9 @@ TextureCache::TCacheEntryBase* TextureCache::Load(unsigned int const stage,
 			using_custom_texture = true;
 		}
 	}
-
+	if(isPaletteTexture) {
+		g_texture_cache->LoadLut( tlutfmt, &texMem[tlutaddr], TexDecoder_GetPaletteSize(texformat) );
+	}
 	if (!using_custom_texture)
 	{
 		
@@ -517,12 +521,15 @@ TextureCache::TCacheEntryBase* TextureCache::Load(unsigned int const stage,
 	const bool use_native_mips = use_mipmaps && !using_custom_lods && (width == nativeW && height == nativeH);
 	texLevels = (use_native_mips || using_custom_lods) ? texLevels : 1; // TODO: Should be forced to 1 for non-pow2 textures (e.g. efb copies with automatically adjusted IR)
 
+	src_temp = src_data;
+	src_temp_size = texture_size;
+
 	//NOTICE_LOG(VIDEO,"RAM2TEX : srcp %p srcfmt %d", address, texformat );
 
 	// create the entry/texture
 	if (nullptr == entry)
 	{
-		textures[texID] = entry = g_texture_cache->CreateTexture(width, height, expandedWidth, texLevels, pcfmt);
+		textures[texID] = entry = g_texture_cache->CreateTexture( texformat, width, height, expandedWidth, texLevels, pcfmt);
 
 		// Sometimes, we can get around recreating a texture if only the number of mip levels changes
 		// e.g. if our texture cache entry got too many mipmap levels we can limit the number of used levels by setting the appropriate render states
@@ -536,10 +543,13 @@ TextureCache::TCacheEntryBase* TextureCache::Load(unsigned int const stage,
 
 		GFX_DEBUGGER_PAUSE_AT(NEXT_NEW_TEXTURE, true);
 	}
-	else
-	{
+	
+	if (!(texformat == GX_TF_RGBA8 && from_tmem)) {
 		// load texture (CreateTexture also loads level 0)
 		entry->Load(width, height, expandedWidth, 0);
+	} else {
+		u8* src_data_gb = &texMem[bpmem.tex[stage/4].texImage2[stage%4].tmem_odd * TMEM_LINE_SIZE];
+		entry->LoadRGBAFromTMEM(src_data,src_data_gb, width, height, expandedWidth, 0);
 	}
 
 
@@ -581,7 +591,11 @@ TextureCache::TCacheEntryBase* TextureCache::Load(unsigned int const stage,
 				const u8*& mip_src_data = from_tmem
 					? ((level % 2) ? ptr_odd : ptr_even)
 					: src_data;
-				TexDecoder_Decode(temp, mip_src_data, expanded_mip_width, expanded_mip_height, texformat, tlutaddr, tlutfmt, g_ActiveConfig.backend_info.bUseRGBATextures);
+				//TexDecoder_Decode(temp, mip_src_data, expanded_mip_width, expanded_mip_height, texformat, tlutaddr, tlutfmt, g_ActiveConfig.backend_info.bUseRGBATextures);
+				
+				src_temp = mip_src_data;
+				src_temp_size = TexDecoder_GetTextureSizeInBytes(expanded_mip_width, expanded_mip_height, texformat);
+				
 				mip_src_data += TexDecoder_GetTextureSizeInBytes(expanded_mip_width, expanded_mip_height, texformat);
 
 				

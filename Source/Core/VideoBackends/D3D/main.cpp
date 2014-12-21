@@ -125,6 +125,7 @@ void InitBackendInfo()
 
 			// Requires the earlydepthstencil attribute (only available in shader model 5)
 			g_Config.backend_info.bSupportsEarlyZ = (DX11::D3D::GetFeatureLevel(ad) == D3D_FEATURE_LEVEL_11_0);
+			g_Config.backend_info.bSupportsShaderModel5 = (DX11::D3D::GetFeatureLevel(ad) >= D3D_FEATURE_LEVEL_11_0);
 		}
 
 		g_Config.backend_info.Adapters.push_back(UTF16ToUTF8(desc.Description));

@@ -4,10 +4,11 @@
 
 #pragma once
 
-#include <d3d11.h>
+#include <d3d11_1.h>
 #include <string>
 
 #include "Common/MathUtil.h"
+#include "VideoBackends/D3D/D3DPtr.h"
 
 namespace DX11
 {
@@ -25,9 +26,9 @@ namespace D3D
 	{
 		ID3D11ShaderResourceView* m_pTexture;
 		ID3D11Buffer* m_pVB;
-		ID3D11InputLayout* m_InputLayout;
-		ID3D11PixelShader* m_pshader;
-		ID3D11VertexShader* m_vshader;
+		D3D::UniquePtr<ID3D11InputLayout> m_InputLayout;
+		D3D::UniquePtr<ID3D11PixelShader> m_pshader;
+		D3D::UniquePtr<ID3D11VertexShader> m_vshader;
 		ID3D11BlendState* m_blendstate;
 		ID3D11RasterizerState* m_raststate;
 		const int m_dwTexWidth;

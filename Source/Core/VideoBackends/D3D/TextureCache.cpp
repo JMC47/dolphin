@@ -8,6 +8,7 @@
 #include "VideoBackends/D3D/FramebufferManager.h"
 #include "VideoBackends/D3D/PixelShaderCache.h"
 #include "VideoBackends/D3D/PSTextureEncoder.h"
+#include "VideoBackends/D3D/PSTextureDecoder.h"
 #include "VideoBackends/D3D/TextureCache.h"
 #include "VideoBackends/D3D/TextureEncoder.h"
 #include "VideoBackends/D3D/VertexShaderCache.h"
@@ -19,6 +20,7 @@ namespace DX11
 {
 
 static TextureEncoder* g_encoder = nullptr;
+static PSTextureDecoder* g_decoder = nullptr;
 const size_t MAX_COPY_BUFFERS = 32;
 ID3D11Buffer* efbcopycbuf[MAX_COPY_BUFFERS] = { 0 };
 
@@ -69,10 +71,23 @@ bool TextureCache::TCacheEntry::Save(const std::string& filename, unsigned int l
 void TextureCache::TCacheEntry::Load(unsigned int width, unsigned int height,
 	unsigned int expanded_width, unsigned int level)
 {
-	D3D::ReplaceRGBATexture2D(texture->GetTex(), TextureCache::temp, width, height, expanded_width, level, usage);
+	//g_decoder->Decode(
+	g_decoder->Decode( nullptr, TextureFormat(format), width, height, level, *texture,0);
+	//D3D::ReplaceRGBATexture2D(texture->GetTex(), TextureCache::temp, width, height, expanded_width, level, usage);
 }
 
-TextureCache::TCacheEntryBase* TextureCache::CreateTexture(unsigned int width,
+void TextureCache::TCacheEntry::LoadRGBAFromTMEM( u8 const* ar_src, u8 const* bg_src, unsigned int width, unsigned int height,
+			unsigned int expanded_width, unsigned int level)
+{
+	//g_decoder->Decode(
+	g_decoder->DecodeRGBAFromTMEM( ar_src, bg_src, width, height, *texture);
+	//D3D::ReplaceRGBATexture2D(texture->GetTex(), TextureCache::temp, width, height, expanded_width, level, usage);
+}
+
+void TextureCache::LoadLut(u32 lutFmt, void* addr, u32 size ) {
+	g_decoder->LoadLut( lutFmt, addr, size );
+}
+TextureCache::TCacheEntryBase* TextureCache::CreateTexture(u32 fmt, unsigned int width,
 	unsigned int height, unsigned int expanded_width,
 	unsigned int tex_levels, PC_TexFormat pcfmt)
 {
@@ -80,7 +95,7 @@ TextureCache::TCacheEntryBase* TextureCache::CreateTexture(unsigned int width,
 	D3D11_CPU_ACCESS_FLAG cpu_access = (D3D11_CPU_ACCESS_FLAG)0;
 	D3D11_SUBRESOURCE_DATA srdata, *data = nullptr;
 
-	if (tex_levels == 1)
+	if (tex_levels == 1 && 0)
 	{
 		usage = D3D11_USAGE_DYNAMIC;
 		cpu_access = D3D11_CPU_ACCESS_WRITE;
@@ -100,6 +115,7 @@ TextureCache::TCacheEntryBase* TextureCache::CreateTexture(unsigned int width,
 
 	TCacheEntry* const entry = new TCacheEntry(new D3DTexture2D(pTexture, D3D11_BIND_SHADER_RESOURCE));
 	entry->usage = usage;
+	entry->format = fmt;
 
 	// TODO: better debug names
 	D3D::SetDebugObjectName((ID3D11DeviceChild*)entry->texture->GetTex(), "a texture of the TextureCache");
@@ -107,8 +123,10 @@ TextureCache::TCacheEntryBase* TextureCache::CreateTexture(unsigned int width,
 
 	SAFE_RELEASE(pTexture);
 
-	if (tex_levels != 1)
-		entry->Load(width, height, expanded_width, 0);
+	if (1 || tex_levels != 1) {
+		//g_decoder->Decode( nullptr, 0, width, height, tex_levels, *(entry->texture),0);
+		//entry->Load(width, height, expanded_width, 0);
+	}
 
 	return entry;
 }
@@ -166,16 +184,19 @@ void TextureCache::TCacheEntry::FromRenderTarget(u32 dstAddr, unsigned int dstFo
 	{
 		u8* dst = Memory::GetPointer(dstAddr);
 		size_t encoded_size = g_encoder->Encode(dst, dstFormat, srcFormat, srcRect, isIntensity, scaleByHalf);
+		//NOTICE_LOG(VIDEO,"EFB2RAM : dstp %p dstfmt %d srcfmt %d [%d %d %d %d]", dstAddr, dstFormat, int( srcFormat), srcRect.left, srcRect.top, srcRect.right, srcRect.bottom);
 
-		u64 hash = GetHash64(dst, (int)encoded_size, g_ActiveConfig.iSafeTextureCache_ColorSamples);
+		if (!g_ActiveConfig.bCopyEFBToTexture) {
+			u64 hash = GetHash64(dst, (int)encoded_size, g_ActiveConfig.iSafeTextureCache_ColorSamples);
 
-		// Mark texture entries in destination address range dynamic unless caching is enabled and the texture entry is up to date
-		if (!g_ActiveConfig.bEFBCopyCacheEnable)
-			TextureCache::MakeRangeDynamic(addr, (u32)encoded_size);
-		else if (!TextureCache::Find(addr, hash))
-			TextureCache::MakeRangeDynamic(addr, (u32)encoded_size);
+			// Mark texture entries in destination address range dynamic unless caching is enabled and the texture entry is up to date
+			if (!g_ActiveConfig.bEFBCopyCacheEnable)
+				TextureCache::MakeRangeDynamic(addr, (u32)encoded_size);
+			else if (!TextureCache::Find(addr, hash))
+				TextureCache::MakeRangeDynamic(addr, (u32)encoded_size);
 
-		this->hash = hash;
+			this->hash = hash;
+		}
 	}
 }
 
@@ -192,6 +213,9 @@ TextureCache::TextureCache()
 	// FIXME: Is it safe here?
 	g_encoder = new PSTextureEncoder;
 	g_encoder->Init();
+
+	g_decoder = new PSTextureDecoder;
+	g_decoder->Init();
 }
 
 TextureCache::~TextureCache()
@@ -201,6 +225,10 @@ TextureCache::~TextureCache()
 
 	g_encoder->Shutdown();
 	delete g_encoder;
+	g_encoder = nullptr;
+
+	g_decoder->Shutdown();
+	delete g_decoder;
 	g_encoder = nullptr;
 }
 

@@ -117,4 +117,20 @@ public:
 
 };
 
+class TextureDecoder
+{
+
+public:
+
+	virtual ~TextureDecoder() { }
+
+	virtual void Init() = 0;
+	virtual void Shutdown() = 0;
+
+	virtual size_t Decode(u8* dst, u32 srcFmt, u32 w, u32 h, u32 levels, D3DTexture2D& dstTexture, u32 dstFmt) = 0;
+	virtual size_t DecodeRGBAFromTMEM( u8 const * ar_src, u8 const * bg_src, u32 width, u32 height, D3DTexture2D& dstTexture) = 0;
+	virtual void LoadLut(u32 lutFmt, void* addr, u32 size ) = 0;
+
+};
+
 }

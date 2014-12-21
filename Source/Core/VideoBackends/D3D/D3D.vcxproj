@@ -55,6 +55,7 @@
     <ClCompile Include="NativeVertexFormat.cpp" />
     <ClCompile Include="PerfQuery.cpp" />
     <ClCompile Include="PixelShaderCache.cpp" />
+    <ClCompile Include="PSTextureDecoder.cpp" />
     <ClCompile Include="PSTextureEncoder.cpp" />
     <ClCompile Include="Render.cpp" />
     <ClCompile Include="stdafx.cpp">
@@ -81,6 +82,7 @@
     <ClInclude Include="main.h" />
     <ClInclude Include="PerfQuery.h" />
     <ClInclude Include="PixelShaderCache.h" />
+    <ClInclude Include="PSTextureDecoder.h" />
     <ClInclude Include="PSTextureEncoder.h" />
     <ClInclude Include="Render.h" />
     <ClInclude Include="stdafx.h" />

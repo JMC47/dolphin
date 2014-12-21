@@ -42,6 +42,9 @@ private:
 		void Load(unsigned int width, unsigned int height,
 			unsigned int expanded_width, unsigned int level) override;
 
+		void LoadRGBAFromTMEM( u8 const* ar_src, u8 const* bg_src, unsigned int width, unsigned int height,
+													 unsigned int expanded_width, unsigned int level) override {}
+
 		void FromRenderTarget(u32 dstAddr, unsigned int dstFormat,
 			PEControl::PixelFormat srcFormat, const EFBRectangle& srcRect,
 			bool isIntensity, bool scaleByHalf, unsigned int cbufid,
@@ -53,7 +56,7 @@ private:
 
 	~TextureCache();
 
-	TCacheEntryBase* CreateTexture(unsigned int width, unsigned int height,
+	TCacheEntryBase* CreateTexture(u32 fmt,unsigned int width, unsigned int height,
 		unsigned int expanded_width, unsigned int tex_levels, PC_TexFormat pcfmt) override;
 
 	TCacheEntryBase* CreateRenderTargetTexture(unsigned int scaled_tex_w, unsigned int scaled_tex_h) override;

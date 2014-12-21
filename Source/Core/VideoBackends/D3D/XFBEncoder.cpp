@@ -188,26 +188,24 @@ void XFBEncoder::Init()
 
 	// Create vertex shader
 
-	D3DBlob* bytecode = nullptr;
-	if (!D3D::CompileVertexShader(XFB_ENCODE_VS, sizeof(XFB_ENCODE_VS), &bytecode))
+	D3DBlob bytecode;
+	if (!D3D::CompileVertexShader(XFB_ENCODE_VS, sizeof(XFB_ENCODE_VS), bytecode))
 	{
 		ERROR_LOG(VIDEO, "XFB encode vertex shader failed to compile");
 		return;
 	}
 
-	hr = D3D::device->CreateVertexShader(bytecode->Data(), bytecode->Size(), nullptr, &m_vShader);
+	hr = D3D::device->CreateVertexShader(bytecode.Data(), bytecode.Size(), nullptr, ToAddr(m_vShader));
 	CHECK(SUCCEEDED(hr), "create xfb encode vertex shader");
-	D3D::SetDebugObjectName(m_vShader, "xfb encoder vertex shader");
+	D3D::SetDebugObjectName(m_vShader.get(), "xfb encoder vertex shader");
 
 	// Create input layout for vertex quad using bytecode from vertex shader
 
 	hr = D3D::device->CreateInputLayout(QUAD_LAYOUT_DESC,
 		sizeof(QUAD_LAYOUT_DESC)/sizeof(D3D11_INPUT_ELEMENT_DESC),
-		bytecode->Data(), bytecode->Size(), &m_quadLayout);
+		bytecode.Data(), bytecode.Size(), &m_quadLayout);
 	CHECK(SUCCEEDED(hr), "create xfb encode quad vertex layout");
 	D3D::SetDebugObjectName(m_quadLayout, "xfb encoder quad layout");
-
-	bytecode->Release();
 
 	// Create pixel shader
 
@@ -217,7 +215,7 @@ void XFBEncoder::Init()
 		ERROR_LOG(VIDEO, "XFB encode pixel shader failed to compile");
 		return;
 	}
-	D3D::SetDebugObjectName(m_pShader, "xfb encoder pixel shader");
+	D3D::SetDebugObjectName(m_pShader.get(), "xfb encoder pixel shader");
 
 	// Create blend state
 
@@ -259,9 +257,10 @@ void XFBEncoder::Shutdown()
 	SAFE_RELEASE(m_xfbEncodeRastState);
 	SAFE_RELEASE(m_xfbEncodeDepthState);
 	SAFE_RELEASE(m_xfbEncodeBlendState);
-	SAFE_RELEASE(m_pShader);
+	m_pShader.reset();
+
 	SAFE_RELEASE(m_quadLayout);
-	SAFE_RELEASE(m_vShader);
+	m_vShader.reset();
 	SAFE_RELEASE(m_quad);
 	SAFE_RELEASE(m_encodeParams);
 	SAFE_RELEASE(m_outStage);
@@ -279,8 +278,8 @@ void XFBEncoder::Encode(u8* dst, u32 width, u32 height, const EFBRectangle& srcR
 
 	// Set up all the state for XFB encoding
 
-	D3D::context->PSSetShader(m_pShader, nullptr, 0);
-	D3D::context->VSSetShader(m_vShader, nullptr, 0);
+	D3D::context->PSSetShader(m_pShader.get(), nullptr, 0);
+	D3D::context->VSSetShader(m_vShader.get(), nullptr, 0);
 	D3D::context->GSSetShader(nullptr, nullptr, 0);
 
 	D3D::stateman->PushBlendState(m_xfbEncodeBlendState);
@@ -350,8 +349,16 @@ void XFBEncoder::Encode(u8* dst, u32 width, u32 height, const EFBRectangle& srcR
 
 	// Transfer staging buffer to GameCube/Wii RAM
 
+	/*D3D11_MAPPED_SUBRESOURCE map = { 0 };
+	hr = D3D::context->Map(m_outStage, 0, D3D11_MAP_READ, D3D, &map);*/
+
+	D3D::context->Flush();
 	D3D11_MAPPED_SUBRESOURCE map = { 0 };
-	hr = D3D::context->Map(m_outStage, 0, D3D11_MAP_READ, 0, &map);
+	while ( (hr = D3D::context->Map(m_outStage, 0, D3D11_MAP_READ, D3D11_MAP_FLAG_DO_NOT_WAIT, &map)) != S_OK && hr==DXGI_ERROR_WAS_STILL_DRAWING )
+	{
+		//D3D::context->Flush();
+	}
+
 	CHECK(SUCCEEDED(hr), "map staging buffer");
 
 	u8* src = (u8*)map.pData;

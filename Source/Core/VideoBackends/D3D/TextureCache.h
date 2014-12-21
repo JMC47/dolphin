@@ -5,6 +5,7 @@
 #pragma once
 
 #include "VideoBackends/D3D/D3DTexture.h"
+#include "VideoBackends/D3D/TextureEncoder.h"
 #include "VideoCommon/TextureCacheBase.h"
 
 namespace DX11
@@ -28,6 +29,9 @@ private:
 
 		void Load(unsigned int width, unsigned int height,
 			unsigned int expanded_width, unsigned int levels) override;
+		
+		void LoadRGBAFromTMEM( u8 const* ar_src, u8 const* bg_src, unsigned int width, unsigned int height,
+			unsigned int expanded_width, unsigned int level) override;
 
 		void FromRenderTarget(u32 dstAddr, unsigned int dstFormat,
 			PEControl::PixelFormat srcFormat, const EFBRectangle& srcRect,
@@ -38,7 +42,8 @@ private:
 		bool Save(const std::string& filename, unsigned int level) override;
 	};
 
-	TCacheEntryBase* CreateTexture(unsigned int width, unsigned int height,
+	void TextureCache::LoadLut(u32 lutFmt, void* addr, u32 size );
+	TCacheEntryBase* CreateTexture(u32 fmt, unsigned int width, unsigned int height,
 		unsigned int expanded_width, unsigned int tex_levels, PC_TexFormat pcfmt) override;
 
 	TCacheEntryBase* CreateRenderTargetTexture(unsigned int scaled_tex_w, unsigned int scaled_tex_h) override;

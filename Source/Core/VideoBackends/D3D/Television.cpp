@@ -100,7 +100,7 @@ void Television::Init()
 
 	m_pShader = D3D::CompileAndCreatePixelShader(YUYV_DECODER_PS, sizeof(YUYV_DECODER_PS));
 	CHECK(m_pShader != nullptr, "compile and create yuyv decoder pixel shader");
-	D3D::SetDebugObjectName(m_pShader, "yuyv decoder pixel shader");
+	D3D::SetDebugObjectName(m_pShader.get(), "yuyv decoder pixel shader");
 
 	// Create sampler state and set border color
 	//
@@ -120,7 +120,7 @@ void Television::Init()
 
 void Television::Shutdown()
 {
-	SAFE_RELEASE(m_pShader);
+	m_pShader.reset();
 	SAFE_RELEASE(m_yuyvTextureSRV);
 	SAFE_RELEASE(m_yuyvTexture);
 	SAFE_RELEASE(m_samplerState);
@@ -156,7 +156,7 @@ void Television::Render()
 			m_yuyvTextureSRV, &sourceRc,
 			MAX_XFB_WIDTH, MAX_XFB_HEIGHT,
 			&destRc,
-			m_pShader,
+			m_pShader.get(),
 			VertexShaderCache::GetSimpleVertexShader(),
 			VertexShaderCache::GetSimpleInputLayout());
 	}

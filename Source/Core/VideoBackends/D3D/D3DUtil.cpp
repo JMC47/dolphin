@@ -255,14 +255,15 @@ int CD3DFont::Init()
 	// setup device objects for drawing
 	m_pshader = D3D::CompileAndCreatePixelShader(fontpixshader, sizeof(fontpixshader));
 	if (m_pshader == nullptr) PanicAlert("Failed to create pixel shader, %s %d\n", __FILE__, __LINE__);
-	D3D::SetDebugObjectName((ID3D11DeviceChild*)m_pshader, "pixel shader of a CD3DFont object");
+	D3D::SetDebugObjectName((ID3D11DeviceChild*)m_pshader.get(), "pixel shader of a CD3DFont object");
 
-	D3DBlob* vsbytecode;
-	D3D::CompileVertexShader(fontvertshader, sizeof(fontvertshader), &vsbytecode);
-	if (vsbytecode == nullptr) PanicAlert("Failed to compile vertex shader, %s %d\n", __FILE__, __LINE__);
+	D3DBlob vsbytecode;
+	if(!D3D::CompileVertexShader(fontvertshader, sizeof(fontvertshader), vsbytecode))
+		PanicAlert("Failed to compile vertex shader, %s %d\n", __FILE__, __LINE__);
 	m_vshader = D3D::CreateVertexShaderFromByteCode(vsbytecode);
-	if (m_vshader == nullptr) PanicAlert("Failed to create vertex shader, %s %d\n", __FILE__, __LINE__);
-	D3D::SetDebugObjectName((ID3D11DeviceChild*)m_vshader, "vertex shader of a CD3DFont object");
+	if (!m_vshader) 
+		PanicAlert("Failed to create vertex shader, %s %d\n", __FILE__, __LINE__);
+	D3D::SetDebugObjectName((ID3D11DeviceChild*)m_vshader.get(), "vertex shader of a CD3DFont object");
 
 	const D3D11_INPUT_ELEMENT_DESC desc[] =
 	{
@@ -270,9 +271,10 @@ int CD3DFont::Init()
 		{ "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 28, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 	};
-	hr = D3D::device->CreateInputLayout(desc, 3, vsbytecode->Data(), vsbytecode->Size(), &m_InputLayout);
-	if (FAILED(hr)) PanicAlert("Failed to create input layout, %s %d\n", __FILE__, __LINE__);
-	SAFE_RELEASE(vsbytecode);
+	hr = D3D::device->CreateInputLayout(desc, 3, vsbytecode.Data(), vsbytecode.Size(), ToAddr(m_InputLayout));
+	if (FAILED(hr)) 
+		PanicAlert("Failed to create input layout, %s %d\n", __FILE__, __LINE__);
+
 
 	D3D11_BLEND_DESC blenddesc;
 	blenddesc.AlphaToCoverageEnable = FALSE;
@@ -308,9 +310,9 @@ int CD3DFont::Shutdown()
 {
 	SAFE_RELEASE(m_pVB);
 	SAFE_RELEASE(m_pTexture);
-	SAFE_RELEASE(m_InputLayout);
-	SAFE_RELEASE(m_pshader);
-	SAFE_RELEASE(m_vshader);
+	m_InputLayout.reset();
+	m_pshader.reset();
+	m_vshader.reset();
 
 	SAFE_RELEASE(m_blendstate);
 	SAFE_RELEASE(m_raststate);
@@ -348,11 +350,11 @@ int CD3DFont::DrawTextScaled(float x, float y, float size, float spacing, u32 dw
 	D3D::stateman->PushRasterizerState(m_raststate);
 	D3D::stateman->Apply();
 
-	D3D::context->PSSetShader(m_pshader, nullptr, 0);
-	D3D::context->VSSetShader(m_vshader, nullptr, 0);
+	D3D::context->PSSetShader(m_pshader.get(), nullptr, 0);
+	D3D::context->VSSetShader(m_vshader.get(), nullptr, 0);
 	D3D::context->GSSetShader(nullptr, nullptr, 0);
 
-	D3D::context->IASetInputLayout(m_InputLayout);
+	D3D::context->IASetInputLayout(m_InputLayout.get());
 	D3D::context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	D3D::context->PSSetShaderResources(0, 1, &m_pTexture);
 

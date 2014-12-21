@@ -4,10 +4,11 @@
 
 #pragma once
 
-#include <d3d11.h>
+#include <d3d11_1.h>
 #include <map>
 
 #include "VideoCommon/PixelShaderGen.h"
+#include "VideoBackends/D3D/D3DPtr.h"
 
 enum DSTALPHA_MODE;
 
@@ -23,7 +24,7 @@ public:
 	static bool SetShader(DSTALPHA_MODE dstAlphaMode, u32 components); // TODO: Should be renamed to LoadShader
 	static bool InsertByteCode(const PixelShaderUid &uid, const void* bytecode, unsigned int bytecodelen);
 
-	static ID3D11PixelShader* GetActiveShader() { return last_entry->shader; }
+	static ID3D11PixelShader* GetActiveShader() { return last_entry->shader.get(); }
 	static u32                GetActiveMask() { return last_entry->mask_; }
 	static ID3D11Buffer* &GetConstantBuffer();
 
@@ -39,13 +40,13 @@ public:
 private:
 	struct PSCacheEntry
 	{
-		ID3D11PixelShader* shader;
+		D3D::UniquePtr<ID3D11PixelShader> shader;
 		u32 mask_ {};
 
 		std::string code;
 
-		PSCacheEntry() : shader(nullptr) {}
-		void Destroy() { SAFE_RELEASE(shader); }
+		PSCacheEntry() {}
+		void Destroy() { shader.reset(); }
 	};
 
 	typedef std::map<PixelShaderUid, PSCacheEntry> PSCache;

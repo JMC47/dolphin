@@ -65,6 +65,9 @@
     <ClCompile Include="LineAndPointGeometryShader.cpp">
       <Filter>Render</Filter>
     </ClCompile>
+    <ClCompile Include="PSTextureDecoder.cpp">
+      <Filter>Render</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="D3DBase.h">
@@ -129,6 +132,9 @@
       <Filter>D3D</Filter>
     </ClInclude>
     <ClInclude Include="LineAndPointGeometryShader.h">
+      <Filter>Render</Filter>
+    </ClInclude>
+    <ClInclude Include="PSTextureDecoder.h">
       <Filter>Render</Filter>
     </ClInclude>
   </ItemGroup>

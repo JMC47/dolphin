@@ -76,6 +76,10 @@ public:
 
 		virtual void Load(unsigned int width, unsigned int height,
 			unsigned int expanded_width, unsigned int level) = 0;
+
+		virtual void LoadRGBAFromTMEM( u8 const* ar_src, u8 const* bg_src, unsigned int width, unsigned int height,
+			unsigned int expanded_width, unsigned int level) = 0;
+
 		virtual void FromRenderTarget(u32 dstAddr, unsigned int dstFormat,
 			PEControl::PixelFormat srcFormat, const EFBRectangle& srcRect,
 			bool isIntensity, bool scaleByHalf, unsigned int cbufid,
@@ -97,7 +101,7 @@ public:
 	static void ClearRenderTargets(); // currently only used by OGL
 	static bool Find(u32 start_address, u64 hash);
 
-	virtual TCacheEntryBase* CreateTexture(unsigned int width, unsigned int height,
+	virtual TCacheEntryBase* CreateTexture(u32 fmt, unsigned int width, unsigned int height,
 		unsigned int expanded_width, unsigned int tex_levels, PC_TexFormat pcfmt) = 0;
 	virtual TCacheEntryBase* CreateRenderTargetTexture(unsigned int scaled_tex_w, unsigned int scaled_tex_h) = 0;
 
@@ -108,11 +112,16 @@ public:
 
 	static void RequestInvalidateTextureCache();
 
+	virtual void LoadLut(u32 lutFmt, void* addr, u32 size ) {}
+
 protected:
 	TextureCache();
 
 	static  GC_ALIGNED16(u8 *temp);
 	static unsigned int temp_size;
+public:
+	static  GC_ALIGNED16(u8 const*src_temp);
+	static unsigned int src_temp_size;
 
 private:
 	static bool CheckForCustomTextureLODs(u64 tex_hash, int texformat, unsigned int levels);

@@ -31,14 +31,15 @@ UidChecker<PixelShaderUid,PixelShaderCode> PixelShaderCache::pixel_uid_checker;
 
 LinearDiskCache<PixelShaderUid, u8> g_ps_disk_cache;
 
-ID3D11PixelShader* s_ColorMatrixProgram[2] = {nullptr};
-ID3D11PixelShader* s_ColorCopyProgram[2] = {nullptr};
-ID3D11PixelShader* s_DepthMatrixProgram[2] = {nullptr};
-ID3D11PixelShader* s_ClearProgram = nullptr;
-ID3D11PixelShader* s_rgba6_to_rgb8[2] = {nullptr};
-ID3D11PixelShader* s_rgb8_to_rgba6[2] = {nullptr};
+D3D::UniquePtr<ID3D11PixelShader> s_ColorMatrixProgram[2];
+D3D::UniquePtr<ID3D11PixelShader> s_ColorCopyProgram[2];
+D3D::UniquePtr<ID3D11PixelShader> s_DepthMatrixProgram[2];
+D3D::UniquePtr<ID3D11PixelShader> s_ClearProgram;
+D3D::UniquePtr<ID3D11PixelShader> s_rgba6_to_rgb8[2];
+D3D::UniquePtr<ID3D11PixelShader> s_rgb8_to_rgba6[2];
 ID3D11Buffer* pscbuf = nullptr;
 ID3D11Buffer* pscbuf_alt = nullptr;
+static PixelShaderConstants s_shadow;
 
 const char clear_program_code[] = {
 	"void main(\n"
@@ -111,7 +112,7 @@ const char color_matrix_program_code_msaa[] = {
 	"}\n"
 };
 
-const char depth_matrix_program[] = {
+const char depth_matrix_program__[] = {
 	"sampler samp0 : register(s0);\n"
 	"Texture2D Tex0 : register(t0);\n"
 	"uniform float4 cColMatrix[7] : register(c0);\n"
@@ -126,7 +127,23 @@ const char depth_matrix_program[] = {
 	"}\n"
 };
 
-const char depth_matrix_program_msaa[] = {
+const char depth_matrix_program[] = R"HLSL(
+sampler samp0 : register(s0);
+Texture2D<float> Tex0 : register(t0);
+uniform float4 cColMatrix[7] : register(c0);
+void main( out float4 ocol0 : SV_Target,
+	         in float4 pos : SV_Position,
+	         in float2 uv0 : TEXCOORD0) {
+		float texcol = Tex0.Sample(samp0,uv0);
+		int zCoord = 0xFFFFFF-round(texcol * float(0xFFFFFF));
+		int3 zCoord3 = int3((zCoord&0xFF0000)>>16, (zCoord&0x00FF00)>>8, (zCoord&0xFF) );
+		float4 oD = float4( float3(zCoord3)/255.f.xxx, 0.f);
+		oD.w = floor(oD.r*15.f)/15.f;
+		ocol0 = float4(dot(oD,cColMatrix[0]),dot(oD,cColMatrix[1]),dot(oD,cColMatrix[2]),dot(oD,cColMatrix[3])) + cColMatrix[4];
+}
+)HLSL";
+
+const char depth_matrix_program_msaa_old[] = {
 	"sampler samp0 : register(s0);\n"
 	"Texture2DMS<float4, %d> Tex0 : register(t0);\n"
 	"uniform float4 cColMatrix[7] : register(c0);\n"
@@ -145,6 +162,27 @@ const char depth_matrix_program_msaa[] = {
 	"ocol0 = float4(dot(texcol,cColMatrix[0]),dot(texcol,cColMatrix[1]),dot(texcol,cColMatrix[2]),dot(texcol,cColMatrix[3])) + cColMatrix[4];\n"
 	"}\n"
 };
+
+const char depth_matrix_program_msaa[] = R"HLSL(
+sampler samp0 : register(s0);
+Texture2DMS<float, %d> Tex0 : register(t0);
+uniform float4 cColMatrix[7] : register(c0);
+void main( out float4 ocol0 : SV_Target,
+	         in float4 pos : SV_Position,
+	         in float2 uv0 : TEXCOORD0) {
+	int width, height, samples;
+	Tex0.GetDimensions(width, height, samples);
+	float texcol = 0;
+	for(int i = 0; i < samples; ++i)
+		texcol += Tex0.Load(int2(uv0.x*(width), uv0.y*(height)), i);
+	texcol /= samples;
+  int zCoord = 0xFFFFFF-round(texcol * float(0xFFFFFF));
+	int3 zCoord3 = int3((zCoord&0xFF0000)>>16, (zCoord&0x00FF00)>>8, (zCoord&0xFF) );
+	float4 oD = float4( float3(zCoord3)/255.f.xxx, 0.f);
+	oD.w = floor(oD.r*15.f)/15.f;
+	ocol0 = float4(dot(oD,cColMatrix[0]),dot(oD,cColMatrix[1]),dot(oD,cColMatrix[2]),dot(oD,cColMatrix[3])) + cColMatrix[4];
+}
+)HLSL";
 
 const char reint_rgba6_to_rgb8[] = {
 	"sampler samp0 : register(s0);\n"
@@ -238,9 +276,9 @@ ID3D11PixelShader* PixelShaderCache::ReinterpRGBA6ToRGB8(bool multisampled)
 		{
 			s_rgba6_to_rgb8[0] = D3D::CompileAndCreatePixelShader(reint_rgba6_to_rgb8, sizeof(reint_rgba6_to_rgb8));
 			CHECK(s_rgba6_to_rgb8[0], "Create RGBA6 to RGB8 pixel shader");
-			D3D::SetDebugObjectName(s_rgba6_to_rgb8[0], "RGBA6 to RGB8 pixel shader");
+			D3D::SetDebugObjectName(s_rgba6_to_rgb8[0].get(), "RGBA6 to RGB8 pixel shader");
 		}
-		return s_rgba6_to_rgb8[0];
+		return s_rgba6_to_rgb8[0].get();
 	}
 	else if (!s_rgba6_to_rgb8[1])
 	{
@@ -251,9 +289,9 @@ ID3D11PixelShader* PixelShaderCache::ReinterpRGBA6ToRGB8(bool multisampled)
 		s_rgba6_to_rgb8[1] = D3D::CompileAndCreatePixelShader(buf, l);
 
 		CHECK(s_rgba6_to_rgb8[1], "Create RGBA6 to RGB8 MSAA pixel shader");
-		D3D::SetDebugObjectName(s_rgba6_to_rgb8[1], "RGBA6 to RGB8 MSAA pixel shader");
+		D3D::SetDebugObjectName(s_rgba6_to_rgb8[1].get(), "RGBA6 to RGB8 MSAA pixel shader");
 	}
-	return s_rgba6_to_rgb8[1];
+	return s_rgba6_to_rgb8[1].get();
 }
 
 ID3D11PixelShader* PixelShaderCache::ReinterpRGB8ToRGBA6(bool multisampled)
@@ -264,9 +302,9 @@ ID3D11PixelShader* PixelShaderCache::ReinterpRGB8ToRGBA6(bool multisampled)
 		{
 			s_rgb8_to_rgba6[0] = D3D::CompileAndCreatePixelShader(reint_rgb8_to_rgba6, sizeof(reint_rgb8_to_rgba6));
 			CHECK(s_rgb8_to_rgba6[0], "Create RGB8 to RGBA6 pixel shader");
-			D3D::SetDebugObjectName(s_rgb8_to_rgba6[0], "RGB8 to RGBA6 pixel shader");
+			D3D::SetDebugObjectName(s_rgb8_to_rgba6[0].get(), "RGB8 to RGBA6 pixel shader");
 		}
-		return s_rgb8_to_rgba6[0];
+		return s_rgb8_to_rgba6[0].get();
 	}
 	else if (!s_rgb8_to_rgba6[1])
 	{
@@ -277,15 +315,15 @@ ID3D11PixelShader* PixelShaderCache::ReinterpRGB8ToRGBA6(bool multisampled)
 		s_rgb8_to_rgba6[1] = D3D::CompileAndCreatePixelShader(buf, l);
 
 		CHECK(s_rgb8_to_rgba6[1], "Create RGB8 to RGBA6 MSAA pixel shader");
-		D3D::SetDebugObjectName(s_rgb8_to_rgba6[1], "RGB8 to RGBA6 MSAA pixel shader");
+		D3D::SetDebugObjectName(s_rgb8_to_rgba6[1].get(), "RGB8 to RGBA6 MSAA pixel shader");
 	}
-	return s_rgb8_to_rgba6[1];
+	return s_rgb8_to_rgba6[1].get();
 }
 
 ID3D11PixelShader* PixelShaderCache::GetColorCopyProgram(bool multisampled)
 {
-	if (!multisampled || D3D::GetAAMode(g_ActiveConfig.iMultisampleMode).Count == 1) return s_ColorCopyProgram[0];
-	else if (s_ColorCopyProgram[1]) return s_ColorCopyProgram[1];
+	if (!multisampled || D3D::GetAAMode(g_ActiveConfig.iMultisampleMode).Count == 1) return s_ColorCopyProgram[0].get();
+	else if (s_ColorCopyProgram[1]) return s_ColorCopyProgram[1].get();
 	else
 	{
 		// create MSAA shader for current AA mode
@@ -293,15 +331,15 @@ ID3D11PixelShader* PixelShaderCache::GetColorCopyProgram(bool multisampled)
 		int l = sprintf_s(buf, 1024, color_copy_program_code_msaa, D3D::GetAAMode(g_ActiveConfig.iMultisampleMode).Count);
 		s_ColorCopyProgram[1] = D3D::CompileAndCreatePixelShader(buf, l);
 		CHECK(s_ColorCopyProgram[1]!=nullptr, "Create color copy MSAA pixel shader");
-		D3D::SetDebugObjectName((ID3D11DeviceChild*)s_ColorCopyProgram[1], "color copy MSAA pixel shader");
-		return s_ColorCopyProgram[1];
+		D3D::SetDebugObjectName((ID3D11DeviceChild*)s_ColorCopyProgram[1].get(), "color copy MSAA pixel shader");
+		return s_ColorCopyProgram[1].get();
 	}
 }
 
 ID3D11PixelShader* PixelShaderCache::GetColorMatrixProgram(bool multisampled)
 {
-	if (!multisampled || D3D::GetAAMode(g_ActiveConfig.iMultisampleMode).Count == 1) return s_ColorMatrixProgram[0];
-	else if (s_ColorMatrixProgram[1]) return s_ColorMatrixProgram[1];
+	if (!multisampled || D3D::GetAAMode(g_ActiveConfig.iMultisampleMode).Count == 1) return s_ColorMatrixProgram[0].get();
+	else if (s_ColorMatrixProgram[1]) return s_ColorMatrixProgram[1].get();
 	else
 	{
 		// create MSAA shader for current AA mode
@@ -309,30 +347,30 @@ ID3D11PixelShader* PixelShaderCache::GetColorMatrixProgram(bool multisampled)
 		int l = sprintf_s(buf, 1024, color_matrix_program_code_msaa, D3D::GetAAMode(g_ActiveConfig.iMultisampleMode).Count);
 		s_ColorMatrixProgram[1] = D3D::CompileAndCreatePixelShader(buf, l);
 		CHECK(s_ColorMatrixProgram[1]!=nullptr, "Create color matrix MSAA pixel shader");
-		D3D::SetDebugObjectName((ID3D11DeviceChild*)s_ColorMatrixProgram[1], "color matrix MSAA pixel shader");
-		return s_ColorMatrixProgram[1];
+		D3D::SetDebugObjectName((ID3D11DeviceChild*)s_ColorMatrixProgram[1].get(), "color matrix MSAA pixel shader");
+		return s_ColorMatrixProgram[1].get();
 	}
 }
 
 ID3D11PixelShader* PixelShaderCache::GetDepthMatrixProgram(bool multisampled)
 {
-	if (!multisampled || D3D::GetAAMode(g_ActiveConfig.iMultisampleMode).Count == 1) return s_DepthMatrixProgram[0];
-	else if (s_DepthMatrixProgram[1]) return s_DepthMatrixProgram[1];
+	if (!multisampled || D3D::GetAAMode(g_ActiveConfig.iMultisampleMode).Count == 1) return s_DepthMatrixProgram[0].get();
+	else if (s_DepthMatrixProgram[1]) return s_DepthMatrixProgram[1].get();
 	else
 	{
 		// create MSAA shader for current AA mode
-		char buf[1024];
-		int l = sprintf_s(buf, 1024, depth_matrix_program_msaa, D3D::GetAAMode(g_ActiveConfig.iMultisampleMode).Count);
+		char buf[2048];
+		int l = sprintf_s(buf, 2048, depth_matrix_program_msaa, D3D::GetAAMode(g_ActiveConfig.iMultisampleMode).Count);
 		s_DepthMatrixProgram[1] = D3D::CompileAndCreatePixelShader(buf, l);
 		CHECK(s_DepthMatrixProgram[1]!=nullptr, "Create depth matrix MSAA pixel shader");
-		D3D::SetDebugObjectName((ID3D11DeviceChild*)s_DepthMatrixProgram[1], "depth matrix MSAA pixel shader");
-		return s_DepthMatrixProgram[1];
+		D3D::SetDebugObjectName((ID3D11DeviceChild*)s_DepthMatrixProgram[1].get(), "depth matrix MSAA pixel shader");
+		return s_DepthMatrixProgram[1].get();
 	}
 }
 
 ID3D11PixelShader* PixelShaderCache::GetClearProgram()
 {
-	return s_ClearProgram;
+	return s_ClearProgram.get();
 }
 
 ID3D11Buffer* &PixelShaderCache::GetConstantBuffer()
@@ -343,8 +381,11 @@ ID3D11Buffer* &PixelShaderCache::GetConstantBuffer()
 	{
 		PixelShaderManager::dirty = false;
 		int sz = g_ActiveConfig.bEnablePixelLighting ? sizeof(PixelShaderConstants) : sizeof(PixelShaderNoLightConstants);
-		D3D::context->UpdateSubresource(buf,0,nullptr, &PixelShaderManager::constants, sz,0);
-		ADDSTAT(stats.thisFrame.bytesUniformStreamed, sz);
+		if ( memcmp(&s_shadow, &PixelShaderManager::constants, sz )) {
+			memcpy(&s_shadow, &PixelShaderManager::constants, sz );
+			D3D::context->UpdateSubresource(buf,0,nullptr, &s_shadow, sz,0);
+			ADDSTAT(stats.thisFrame.bytesUniformStreamed, sz);
+		}
 	}
 	return buf;
 }
@@ -376,22 +417,22 @@ void PixelShaderCache::Init()
 	// used when drawing clear quads
 	s_ClearProgram = D3D::CompileAndCreatePixelShader(clear_program_code, sizeof(clear_program_code));
 	CHECK(s_ClearProgram!=nullptr, "Create clear pixel shader");
-	D3D::SetDebugObjectName((ID3D11DeviceChild*)s_ClearProgram, "clear pixel shader");
+	D3D::SetDebugObjectName((ID3D11DeviceChild*)s_ClearProgram.get(), "clear pixel shader");
 
 	// used when copying/resolving the color buffer
 	s_ColorCopyProgram[0] = D3D::CompileAndCreatePixelShader(color_copy_program_code, sizeof(color_copy_program_code));
 	CHECK(s_ColorCopyProgram[0]!=nullptr, "Create color copy pixel shader");
-	D3D::SetDebugObjectName((ID3D11DeviceChild*)s_ColorCopyProgram[0], "color copy pixel shader");
+	D3D::SetDebugObjectName((ID3D11DeviceChild*)s_ColorCopyProgram[0].get(), "color copy pixel shader");
 
 	// used for color conversion
 	s_ColorMatrixProgram[0] = D3D::CompileAndCreatePixelShader(color_matrix_program_code, sizeof(color_matrix_program_code));
 	CHECK(s_ColorMatrixProgram[0]!=nullptr, "Create color matrix pixel shader");
-	D3D::SetDebugObjectName((ID3D11DeviceChild*)s_ColorMatrixProgram[0], "color matrix pixel shader");
+	D3D::SetDebugObjectName((ID3D11DeviceChild*)s_ColorMatrixProgram[0].get(), "color matrix pixel shader");
 
 	// used for depth copy
 	s_DepthMatrixProgram[0] = D3D::CompileAndCreatePixelShader(depth_matrix_program, sizeof(depth_matrix_program));
 	CHECK(s_DepthMatrixProgram[0]!=nullptr, "Create depth matrix pixel shader");
-	D3D::SetDebugObjectName((ID3D11DeviceChild*)s_DepthMatrixProgram[0], "depth matrix pixel shader");
+	D3D::SetDebugObjectName((ID3D11DeviceChild*)s_DepthMatrixProgram[0].get(), "depth matrix pixel shader");
 
 	Clear();
 
@@ -427,11 +468,11 @@ void PixelShaderCache::Clear()
 // Used in Swap() when AA mode has changed
 void PixelShaderCache::InvalidateMSAAShaders()
 {
-	SAFE_RELEASE(s_ColorCopyProgram[1]);
-	SAFE_RELEASE(s_ColorMatrixProgram[1]);
-	SAFE_RELEASE(s_DepthMatrixProgram[1]);
-	SAFE_RELEASE(s_rgb8_to_rgba6[1]);
-	SAFE_RELEASE(s_rgba6_to_rgb8[1]);
+	s_ColorCopyProgram[1].reset();
+	s_ColorMatrixProgram[1].reset();
+	s_DepthMatrixProgram[1].reset();
+	s_rgb8_to_rgba6[1].reset();
+	s_rgba6_to_rgb8[1].reset();
 }
 
 void PixelShaderCache::Shutdown()
@@ -439,16 +480,18 @@ void PixelShaderCache::Shutdown()
 	SAFE_RELEASE(pscbuf);
 	SAFE_RELEASE(pscbuf_alt);
 
-	SAFE_RELEASE(s_ClearProgram);
-	for (int i = 0; i < 2; ++i)
-	{
-		SAFE_RELEASE(s_ColorCopyProgram[i]);
-		SAFE_RELEASE(s_ColorMatrixProgram[i]);
-		SAFE_RELEASE(s_DepthMatrixProgram[i]);
-		SAFE_RELEASE(s_rgba6_to_rgb8[i]);
-		SAFE_RELEASE(s_rgb8_to_rgba6[i]);
-	}
-
+	s_ClearProgram.reset();
+	for( auto & p : s_ColorCopyProgram )
+		p.reset();
+	for( auto & p : s_ColorMatrixProgram )
+		p.reset();
+	for( auto & p : s_DepthMatrixProgram )
+		p.reset();
+	for( auto & p : s_rgba6_to_rgb8 )
+		p.reset();
+	for( auto & p : s_rgb8_to_rgba6 )
+		p.reset();
+	
 	Clear();
 	g_ps_disk_cache.Sync();
 	g_ps_disk_cache.Close();
@@ -493,19 +536,18 @@ bool PixelShaderCache::SetShader(DSTALPHA_MODE dstAlphaMode, u32 components)
 	PixelShaderCode code;
 	GeneratePixelShaderCode(code, dstAlphaMode, API_D3D, components);
 
-	D3DBlob* pbytecode;
-	if (!D3D::CompilePixelShader(code.GetBuffer(), (unsigned int)strlen(code.GetBuffer()), &pbytecode))
+	D3DBlob bytecode;
+	if (!D3D::CompilePixelShader(code.GetBuffer(), (unsigned int)strlen(code.GetBuffer()), bytecode))
 	{
 		GFX_DEBUGGER_PAUSE_AT(NEXT_ERROR, true);
 		return false;
 	}
 
 	// Insert the bytecode into the caches
-	g_ps_disk_cache.Append(uid, pbytecode->Data(), pbytecode->Size());
+	g_ps_disk_cache.Append(uid, bytecode.Data(), bytecode.Size());
 
-	bool success = InsertByteCode(uid, pbytecode->Data(), pbytecode->Size());
-	pbytecode->Release();
-
+	bool success = InsertByteCode(uid, bytecode.Data(), bytecode.Size());
+	
 	if (g_ActiveConfig.bEnableShaderDebugging && success)
 	{
 		PixelShaders[uid].code = code.GetBuffer();
@@ -517,19 +559,18 @@ bool PixelShaderCache::SetShader(DSTALPHA_MODE dstAlphaMode, u32 components)
 
 bool PixelShaderCache::InsertByteCode(const PixelShaderUid &uid, const void* bytecode, unsigned int bytecodelen)
 {
-	ID3D11PixelShader* shader = D3D::CreatePixelShaderFromByteCode(bytecode, bytecodelen);
+	auto shader = D3D::CreatePixelShaderFromByteCode(bytecode, bytecodelen);
 	if (shader == nullptr)
 		return false;
 
 	// TODO: Somehow make the debug name a bit more specific
-	D3D::SetDebugObjectName((ID3D11DeviceChild*)shader, "a pixel shader of PixelShaderCache");
+	D3D::SetDebugObjectName((ID3D11DeviceChild*)shader.get(), "a pixel shader of PixelShaderCache");
 
 	// Make an entry in the table
-	PSCacheEntry newentry;
-	newentry.shader = shader;
+	auto& newentry = PixelShaders[uid];
+	newentry.shader = std::move(shader);
 	newentry.mask_ = D3D::ReflectTextureMask(bytecode, bytecodelen);
-	PixelShaders[uid] = newentry;
-	last_entry = &PixelShaders[uid];
+	last_entry = &newentry;
 
 	if (!shader) {
 		// INCSTAT(stats.numPixelShadersFailed);
