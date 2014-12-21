@@ -27,6 +27,8 @@ namespace D3D
 		D3DBlob** blob, const D3D_SHADER_MACRO* pDefines = nullptr);
 	bool CompilePixelShader(const char* code, unsigned int len,
 		D3DBlob** blob, const D3D_SHADER_MACRO* pDefines = nullptr);
+	bool CompileComputeShader(const char* code, unsigned int len,
+		D3DBlob** blob, const D3D_SHADER_MACRO* pDefines = nullptr);
 
 	// Utility functions
 	ID3D11VertexShader* CompileAndCreateVertexShader(const char* code,

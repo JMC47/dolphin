@@ -21,6 +21,7 @@ class WrapDeviceContext {
 		ID3D11PixelShader *      ps_{};
 		ID3D11GeometryShader *   gs_{};
 		ID3D11VertexShader *     vs_{};
+		ID3D11ComputeShader *    cs_{};
 		D3D11_PRIMITIVE_TOPOLOGY topology_= D3D11_PRIMITIVE_TOPOLOGY(-1);
 		ID3D11InputLayout *      il_{};
 
@@ -198,6 +199,13 @@ public:
 		if ( pShader != c_.vs_ ) {
 			c_.vs_ = pShader;
 			ctx_->VSSetShader( pShader, ppClassInstances, NumClassInstances );
+		}
+	}
+
+	void CSSetShader( ID3D11ComputeShader *pShader, ID3D11ClassInstance *const *ppClassInstances, UINT NumClassInstances ){
+		if (pShader != c_.cs_) {
+			c_.cs_ = pShader;
+			ctx_->CSSetShader( pShader, ppClassInstances, NumClassInstances );
 		}
 	}
 

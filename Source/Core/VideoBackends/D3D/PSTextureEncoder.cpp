@@ -47,39 +47,7 @@ union EFBEncodeParams
 	u8 pad[32]; // Pad to the next multiple of 16 bytes
 };
 
-static const char EFB_ENCODE_VS[] = R"HLSL(
-// dolphin-emu EFB encoder vertex shader
-
-cbuffer cbParams : register(b0)
-{
-	struct // Should match EFBEncodeParams above
-	{
-		float NumHalfCacheLinesX;
-		float NumBlocksY;
-		float PosX; // Upper-left corner of source
-		float PosY;
-		float TexLeft; // Rectangle within EFBTexture representing the actual EFB (normalized)
-		float TexTop;
-		float TexRight;
-		float TexBottom;
-	} Params;
-}
-
-struct Output
-{
-	float4 Pos : SV_Position;
-	float2 Coord : ENCODECOORD;
-};
-
-Output main(in float2 Pos : POSITION)
-{
-	Output result;
-	result.Pos = float4(2*Pos.x-1, -2*Pos.y+1, 0.0, 1.0);
-	result.Coord = Pos * float2(Params.NumHalfCacheLinesX, Params.NumBlocksY);
-	return result;
-})HLSL";
-
-static const char EFB_ENCODE_PS[] = R"HLSL(
+static const char EFB_ENCODE_CS[] = R"HLSL(
 // dolphin-emu EFB encoder pixel shader
 
 // Input
@@ -182,7 +150,7 @@ float2 CalcTexCoord(float2 coord)
 float4 Fetch_0(float2 coord)
 {
 	float2 texCoord = CalcTexCoord(coord);
-	float4 result = EFBTexture.Sample(EFBSampler, texCoord);
+	float4 result = EFBTexture.SampleLevel(EFBSampler, texCoord,0);
 	result.a = 1.0;
 	return result;
 }
@@ -190,13 +158,13 @@ float4 Fetch_0(float2 coord)
 float4 Fetch_1(float2 coord)
 {
 	float2 texCoord = CalcTexCoord(coord);
-	return EFBTexture.Sample(EFBSampler, texCoord);
+	return EFBTexture.SampleLevel(EFBSampler, texCoord,0);
 }
 
 float4 Fetch_2(float2 coord)
 {
 	float2 texCoord = CalcTexCoord(coord);
-	float4 result = EFBTexture.Sample(EFBSampler, texCoord);
+	float4 result = EFBTexture.SampleLevel(EFBSampler, texCoord,0);
 	result.a = 1.0;
 	return result;
 }
@@ -205,7 +173,7 @@ float4 Fetch_3(float2 coord)
 {
 	float2 texCoord = CalcTexCoord(coord);
 
-	uint depth24 = 0xFFFFFF * EFBTexture.Sample(EFBSampler, texCoord).r;
+	uint depth24 = 0xFFFFFF - 0xFFFFFF * EFBTexture.SampleLevel(EFBSampler, texCoord,0).r;
 	uint4 bytes = uint4(
 		(depth24 >> 16) & 0xFF, // r
 		(depth24 >> 8) & 0xFF,  // g
@@ -538,7 +506,8 @@ uint4 Generate_4(float2 cacheCoord) // R5 G6 B5
 
 	return Swap4_32(uint4(dw0, dw1, dw2, dw3));
 }
-
+)HLSL" // Visual do not like string literal of more than 16K and it is legit, that should be an external resource
+R"HLSL(
 uint4 Generate_5(float2 cacheCoord) // 1 R5 G5 B5 or 0 A3 R4 G4 G4
 {
 	float2 blockCoord = floor(cacheCoord / float2(2,1));
@@ -840,12 +809,38 @@ iGenerator g_generator;
 #error No generator specified
 #endif
 
-void main(out uint4 ocol0 : SV_Target, in float4 Pos : SV_Position, in float2 fCacheCoord : ENCODECOORD)
+#ifndef SHADER_MODEL
+#error Missing shader model version
+#endif
+
+#if SHADER_MODEL >= 5
+RWBuffer<uint> outBuf :register(u0);
+#else
+RWByteAddressBuffer outBuf :register(u0);
+#endif
+[numthreads(8,8,1)]
+void main(in uint3 groupIdx : SV_GroupID, in uint3 subgroup : SV_GroupThreadID)
 {
-	float2 cacheCoord = floor(fCacheCoord);
-	ocol0 = IMP_GENERATOR(cacheCoord);
-})HLSL"
-;
+	int2 cacheCoord = groupIdx.xy * 8 + subgroup.xy;
+	if (cacheCoord.x < Params.NumHalfCacheLinesX && cacheCoord.y < Params.NumBlocksY) {
+		uint4 ocol0 = IMP_GENERATOR(cacheCoord);
+
+		uint idx = 4 * (Params.NumHalfCacheLinesX*cacheCoord.y + cacheCoord.x);
+#if SHADER_MODEL >= 5
+		outBuf[idx+0] = ocol0.x;
+		outBuf[idx+1] = ocol0.y;
+		outBuf[idx+2] = ocol0.z;
+		outBuf[idx+3] = ocol0.w;
+#else
+		idx *= 4;
+		outBuf.Store4( idx+4*0, ocol0.x);
+		outBuf.Store4( idx+4*1, ocol0.y);
+		outBuf.Store4( idx+4*2, ocol0.z);
+		outBuf.Store4( idx+4*3, ocol0.w);
+#endif
+	}
+}
+)HLSL";
 
 PSTextureEncoder::PSTextureEncoder()
 	: m_ready(false), m_out(nullptr), m_outRTV(nullptr), m_outStage(nullptr),
@@ -916,40 +911,7 @@ void PSTextureEncoder::Init()
 	CHECK(SUCCEEDED(hr), "create efb encode params buffer");
 	D3D::SetDebugObjectName(m_encodeParams, "efb encoder params buffer");
 
-	// Create vertex quad
-
-	bd = CD3D11_BUFFER_DESC(sizeof(QUAD_VERTS), D3D11_BIND_VERTEX_BUFFER,
-		D3D11_USAGE_IMMUTABLE);
-	D3D11_SUBRESOURCE_DATA srd = { QUAD_VERTS, 0, 0 };
-
-	hr = D3D::device->CreateBuffer(&bd, &srd, &m_quad);
-	CHECK(SUCCEEDED(hr), "create efb encode quad vertex buffer");
-	D3D::SetDebugObjectName(m_quad, "efb encoder quad vertex buffer");
-
-	// Create vertex shader
-
-	D3DBlob* bytecode = nullptr;
-	if (!D3D::CompileVertexShader(EFB_ENCODE_VS, sizeof(EFB_ENCODE_VS), &bytecode))
-	{
-		ERROR_LOG(VIDEO, "EFB encode vertex shader failed to compile");
-		return;
-	}
-
-	hr = D3D::device->CreateVertexShader(bytecode->Data(), bytecode->Size(), nullptr, &m_vShader);
-	CHECK(SUCCEEDED(hr), "create efb encode vertex shader");
-	D3D::SetDebugObjectName(m_vShader, "efb encoder vertex shader");
-
-	// Create input layout for vertex quad using bytecode from vertex shader
-
-	hr = D3D::device->CreateInputLayout(QUAD_LAYOUT_DESC,
-		sizeof(QUAD_LAYOUT_DESC)/sizeof(D3D11_INPUT_ELEMENT_DESC),
-		bytecode->Data(), bytecode->Size(), &m_quadLayout);
-	CHECK(SUCCEEDED(hr), "create efb encode quad vertex layout");
-	D3D::SetDebugObjectName(m_quadLayout, "efb encoder quad layout");
-
-	bytecode->Release();
-
-	// Create pixel shader
+	// Create compute shader
 
 #ifdef USE_DYNAMIC_MODE
 	if (!InitDynamicMode())
@@ -1220,7 +1182,13 @@ bool PSTextureEncoder::SetStaticShader(unsigned int dstFormat, PEControl::PixelF
 	ComboKey key = MakeComboKey(dstFormat, srcFormat, isIntensity, scaleByHalf);
 
 	ComboMap::iterator it = m_staticShaders.find(key);
-	if (it == m_staticShaders.end())
+
+	ID3D11ComputeShader* shader{};
+	if (it != m_staticShaders.end())
+	{
+		shader = it->second;
+	}
+	else
 	{
 		const char* generatorFuncName = nullptr;
 		switch (generatorNum)
@@ -1254,9 +1222,10 @@ bool PSTextureEncoder::SetStaticShader(unsigned int dstFormat, PEControl::PixelF
 			{ "IMP_SCALEDFETCH", SCALEDFETCH_FUNC_NAMES[scaledFetchNum] },
 			{ "IMP_INTENSITY", INTENSITY_FUNC_NAMES[intensityNum] },
 			{ "IMP_GENERATOR", generatorFuncName },
+			{ "SHADER_MODEL", "5" }, // TODO: detect if we support 5
 			{ nullptr, nullptr }
 		};
-		if (!D3D::CompilePixelShader(EFB_ENCODE_PS, sizeof(EFB_ENCODE_PS), &bytecode, macros))
+		if (!D3D::CompileComputeShader(EFB_ENCODE_CS, sizeof(EFB_ENCODE_CS), &bytecode, macros))
 		{
 			WARN_LOG(VIDEO, "EFB encoder shader for dstFormat 0x%X, srcFormat %d, isIntensity %d, scaleByHalf %d failed to compile",
 				dstFormat, static_cast<int>(srcFormat), isIntensity ? 1 : 0, scaleByHalf ? 1 : 0);
@@ -1266,23 +1235,19 @@ bool PSTextureEncoder::SetStaticShader(unsigned int dstFormat, PEControl::PixelF
 			return false;
 		}
 
-		ID3D11PixelShader* newShader;
-		HRESULT hr = D3D::device->CreatePixelShader(bytecode->Data(), bytecode->Size(), nullptr, &newShader);
-		CHECK(SUCCEEDED(hr), "create efb encoder pixel shader");
+		ID3D11ComputeShader* newShader;
+		HRESULT hr = D3D::device->CreateComputeShader(bytecode->Data(), bytecode->Size(), nullptr, &newShader);
+		CHECK(SUCCEEDED(hr), "create efb encoder compute shader");
 
-		it = m_staticShaders.insert(std::make_pair(key, newShader)).first;
+		m_staticShaders.emplace(key, newShader);
+		shader = newShader;
 		bytecode->Release();
 	}
 
-	if (it != m_staticShaders.end())
+	if (shader)
 	{
-		if (it->second)
-		{
-			D3D::context->PSSetShader(it->second, nullptr, 0);
-			return true;
-		}
-		else
-			return false;
+		D3D::context->CSSetShader(shader, nullptr, 0);
+		return true;
 	}
 	else
 		return false;
@@ -1298,9 +1263,9 @@ bool PSTextureEncoder::InitDynamicMode()
 	};
 
 	D3DBlob* bytecode = nullptr;
-	if (!D3D::CompilePixelShader(EFB_ENCODE_PS, sizeof(EFB_ENCODE_PS), &bytecode, macros))
+	if (!D3D::CompilePixelShader(EFB_ENCODE_CS, sizeof(EFB_ENCODE_CS), &bytecode, macros))
 	{
-		ERROR_LOG(VIDEO, "EFB encode pixel shader failed to compile");
+		ERROR_LOG(VIDEO, "EFB encode compute shader failed to compile");
 		return false;
 	}
 
