@@ -2,9 +2,11 @@
 // Licensed under GPLv2
 // Refer to the license.txt file included.
 
+
 #include <algorithm>
 
 #include <unordered_set>
+#include <tuple>
 #include "Common/FileUtil.h"
 #include "Common/MemoryUtil.h"
 
@@ -35,6 +37,7 @@ unsigned int TextureCache::temp_size;
 
 GC_ALIGNED16(u8 const* TextureCache::src_temp) = nullptr;
 unsigned int TextureCache::src_temp_size;
+
 TextureCache::TexCache TextureCache::textures;
 
 TextureCache::BackupConfig TextureCache::backup_config;
@@ -505,13 +508,15 @@ TextureCache::TCacheEntryBase* TextureCache::Load(unsigned int const stage,
 
 		if (!(texformat == GX_TF_RGBA8 && from_tmem))
 		{
-			pcfmt = TexDecoder_Decode(temp, src_data, expandedWidth,
-						expandedHeight, texformat, tlutaddr, tlutfmt, g_ActiveConfig.backend_info.bUseRGBATextures);
+			pcfmt = PC_TEX_FMT_RGBA32;
+			//pcfmt = TexDecoder_Decode(temp, src_data, expandedWidth,
+			//			expandedHeight, texformat, tlutaddr, tlutfmt, g_ActiveConfig.backend_info.bUseRGBATextures);
 		}
 		else
 		{
-			u8* src_data_gb = &texMem[bpmem.tex[stage/4].texImage2[stage%4].tmem_odd * TMEM_LINE_SIZE];
-			pcfmt = TexDecoder_DecodeRGBA8FromTmem(temp, src_data, src_data_gb, expandedWidth, expandedHeight);
+			//u8* src_data_gb = &texMem[bpmem.tex[stage/4].texImage2[stage%4].tmem_odd * TMEM_LINE_SIZE];
+			//pcfmt = TexDecoder_DecodeRGBA8FromTmem(temp, src_data, src_data_gb, expandedWidth, expandedHeight);
+			pcfmt = PC_TEX_FMT_RGBA32;
 		}
 	}
 
