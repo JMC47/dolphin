@@ -292,9 +292,35 @@ public:
 		ctx_->DrawIndexed( IndexCount, StartIndexLocation, BaseVertexLocation );
 	}
 
+	void ClearUnorderedAccessViewUint( ID3D11UnorderedAccessView *pRenderTargetView, const UINT ColorRGBA[ 4 ] ) {
+		ctx_->ClearUnorderedAccessViewUint( pRenderTargetView, ColorRGBA );
+	}
+
 	void Draw( UINT VertexCount, UINT StartVertexLocation ) {
 		ApplyLazyStates();
 		ctx_->Draw( VertexCount, StartVertexLocation );
+	}
+
+	void CSSetSamplers( UINT StartSlot, UINT NumSamplers, ID3D11SamplerState *const *ppSamplers ){
+		ctx_->CSSetSamplers(StartSlot,NumSamplers, ppSamplers);
+	}
+
+	void CSSetShaderResources( UINT StartSlot, UINT NumViews, ID3D11ShaderResourceView *const *ppShaderResourceViews ) {
+		ctx_->CSSetShaderResources(StartSlot,NumViews, ppShaderResourceViews);
+	}
+
+	void CSSetUnorderedAccessViews( UINT StartSlot, UINT Num, ID3D11UnorderedAccessView *const *ppUavs ){
+		ctx_->CSSetUnorderedAccessViews(StartSlot,Num, ppUavs,nullptr);
+	}
+
+	void CSSetConstantBuffers( UINT StartSlot, UINT NumBuffers, ID3D11Buffer *const *ppConstantBuffers ) {
+		ctx_->CSSetConstantBuffers(StartSlot,NumBuffers, ppConstantBuffers);
+	}
+
+
+	void Dispatch( UINT X, UINT Y, UINT Z) {
+		ApplyLazyStates();
+		ctx_->Dispatch( X, Y, Z );
 	}
 
 	void UpdateSubresource( ID3D11Resource *pDstResource, UINT DstSubresource, const D3D11_BOX *pDstBox, const void *pSrcData, UINT SrcRowPitch, UINT SrcDepthPitch ){
