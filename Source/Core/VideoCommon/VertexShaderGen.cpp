@@ -40,7 +40,7 @@ template<class T>
 static inline void GenerateVSOutputStruct(T& object, API_TYPE api_type)
 {
 	object.Write("struct VS_OUTPUT {\n");
-	DefineVSOutputStructMember(object, api_type, "float4", "pos", -1, "POSITION");
+	DefineVSOutputStructMember(object, api_type, "float4", "pos", -1, api_type == API_OPENGL ? "POSITION" : "SV_Position");
 	DefineVSOutputStructMember(object, api_type, "float4", "colors_", 0, "COLOR", 0);
 	DefineVSOutputStructMember(object, api_type, "float4", "colors_", 1, "COLOR", 1);
 
@@ -398,7 +398,8 @@ static inline void GenerateVertexShader(T& out, u32 components, API_TYPE api_typ
 	//if not early z culling will improve speed
 	if (api_type == API_D3D)
 	{
-		out.Write("o.pos.z = " I_DEPTHPARAMS".x * o.pos.w + o.pos.z * " I_DEPTHPARAMS".y;\n");
+		out.Write("o.pos.z = " I_DEPTHPARAMS".x * o.pos.w + o.pos.z * " I_DEPTHPARAMS".y;\n"); // dp.x is vp.near and // dp.y is (vp.far-vp.near)
+		out.Write("o.pos.z *= -1;\n");
 	}
 	else // OGL
 	{
@@ -423,7 +424,7 @@ static inline void GenerateVertexShader(T& out, u32 components, API_TYPE api_typ
 	// which in turn can be critical if it happens for clear quads.
 	// Hence, we compensate for this pixel center difference so that primitives
 	// get rasterized correctly.
-	out.Write("o.pos.xy = o.pos.xy - " I_DEPTHPARAMS".zw;\n");
+	out.Write("o.pos.xy = o.pos.xy - o.pos.ww * " I_DEPTHPARAMS".zw;\n");
 
 	if (api_type == API_OPENGL)
 	{

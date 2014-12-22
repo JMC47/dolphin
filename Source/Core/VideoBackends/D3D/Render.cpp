@@ -219,7 +219,7 @@ Renderer::Renderer()
 	memset(&gx_state.depthdc, 0, sizeof(gx_state.depthdc));
 	gx_state.depthdc.DepthEnable      = TRUE;
 	gx_state.depthdc.DepthWriteMask   = D3D11_DEPTH_WRITE_MASK_ALL;
-	gx_state.depthdc.DepthFunc        = D3D11_COMPARISON_LESS;
+	gx_state.depthdc.DepthFunc        = D3D11_COMPARISON_GREATER;
 	gx_state.depthdc.StencilEnable    = FALSE;
 	gx_state.depthdc.StencilReadMask  = D3D11_DEFAULT_STENCIL_READ_MASK;
 	gx_state.depthdc.StencilWriteMask = D3D11_DEFAULT_STENCIL_WRITE_MASK;
@@ -408,7 +408,7 @@ u32 Renderer::AccessEFB(EFBAccessType type, u32 x, u32 y, u32 poke_data)
 		float val = 0.f;
 		// read the data from system memory
 		if ( S_OK == D3D::context->Map(read_tex, 0, D3D11_MAP_READ, 0, &map) ) {
-			val = *(float*)map.pData;
+			val = 1.f - *(float*)map.pData; // depth buffer logic is inverted in d3d
 			D3D::context->Unmap(read_tex, 0);
 		} 
 
@@ -518,10 +518,27 @@ void Renderer::SetViewport()
 	Wd = (X + Wd <= GetTargetWidth()) ? Wd : (GetTargetWidth() - X);
 	Ht = (Y + Ht <= GetTargetHeight()) ? Ht : (GetTargetHeight() - Y);
 
+	auto zfar = xfmem.viewport.farZ;
+	auto zRange = xfmem.viewport.zRange;
+
+	if (zRange<0)
+		gx_state.rastdc.FrontCounterClockwise = TRUE;
+	else
+		gx_state.rastdc.FrontCounterClockwise = FALSE;
+
+	D3D11_VIEWPORT vp;
 	// Some games set invalid values for z-min and z-max so fix them to the max and min allowed and let the shaders do this work
-	D3D11_VIEWPORT vp = CD3D11_VIEWPORT(X, Y, Wd, Ht,
-										0.f,  // (xfmem.viewport.farZ - xfmem.viewport.zRange) / 16777216.0f;
-										1.f); //  xfmem.viewport.farZ / 16777216.0f;
+	// To emulate the same depth buffer accurancy, we revert the depth test and viewport need to be 1-far..1-near
+	 vp = CD3D11_VIEWPORT(X, Y, Wd, Ht,
+										 1.f - zfar / 16777216.0f,
+										 1.f - (zfar - zRange) / 16777216.0f
+										 );
+	//TODO: Remove the clipdistance and viewport transform from vertex shader when the viewport is in 0..1 range
+	//TODO: when the range overflow, clamp to 0..1 and use scale and bias at the end of the vertex shader, clip planes should not be useful
+	//TODO: Some games use an inverted near = 0 and far = -1, check what has to be done in that case.
+	vp.MaxDepth = 1.f;
+	vp.MinDepth = 0.f;
+
 	D3D::context->RSSetViewports(1, &vp);
 }
 
@@ -546,7 +563,7 @@ void Renderer::ClearScreen(const EFBRectangle& rc, bool colorEnable, bool alphaE
 
 	// Color is passed in bgra mode so we need to convert it to rgba
 	u32 rgbaColor = (color & 0xFF00FF00) | ((color >> 16) & 0xFF) | ((color << 16) & 0xFF0000);
-	D3D::drawClearQuad(rgbaColor, (z & 0xFFFFFF) / float(0xFFFFFF), PixelShaderCache::GetClearProgram(), VertexShaderCache::GetClearVertexShader(), VertexShaderCache::GetClearInputLayout());
+	D3D::drawClearQuad(rgbaColor, (0xFFFFFF-(z & 0xFFFFFF)) / float(0xFFFFFF), PixelShaderCache::GetClearProgram(), VertexShaderCache::GetClearVertexShader(), VertexShaderCache::GetClearInputLayout());
 
 	D3D::stateman->PopDepthState();
 	D3D::stateman->PopBlendState();
@@ -1158,12 +1175,12 @@ void Renderer::SetDepthMode()
 	const D3D11_COMPARISON_FUNC d3dCmpFuncs[8] =
 	{
 		D3D11_COMPARISON_NEVER,
-		D3D11_COMPARISON_LESS,
-		D3D11_COMPARISON_EQUAL,
-		D3D11_COMPARISON_LESS_EQUAL,
 		D3D11_COMPARISON_GREATER,
-		D3D11_COMPARISON_NOT_EQUAL,
+		D3D11_COMPARISON_EQUAL,
 		D3D11_COMPARISON_GREATER_EQUAL,
+		D3D11_COMPARISON_LESS,
+		D3D11_COMPARISON_NOT_EQUAL,
+		D3D11_COMPARISON_LESS_EQUAL,
 		D3D11_COMPARISON_ALWAYS
 	};
 
@@ -1172,12 +1189,17 @@ void Renderer::SetDepthMode()
 		gx_state.depthdc.DepthEnable = TRUE;
 		gx_state.depthdc.DepthWriteMask = bpmem.zmode.updateenable ? D3D11_DEPTH_WRITE_MASK_ALL : D3D11_DEPTH_WRITE_MASK_ZERO;
 		gx_state.depthdc.DepthFunc = d3dCmpFuncs[bpmem.zmode.func];
+		gx_state.rastdc.DepthClipEnable = FALSE;//xfmem.clipDisable == 0;
 	}
 	else
 	{
 		// if the test is disabled write is disabled too
 		gx_state.depthdc.DepthEnable = FALSE;
 		gx_state.depthdc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
+		gx_state.rastdc.DepthClipEnable = FALSE;
+	}
+	if (bpmem.genMode.zfreeze != 0) {
+			gx_state.depthdc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
 	}
 }
 
