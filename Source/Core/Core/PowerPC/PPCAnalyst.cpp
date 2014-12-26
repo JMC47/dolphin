@@ -37,8 +37,8 @@ static const u32 FUNCTION_FOLLOWING_THRESHOLD = 16;
 
 CodeBuffer::CodeBuffer(int size)
 {
-	codebuffer = new PPCAnalyst::CodeOp[size];
-	size_ = size;
+	codebuffer = new PPCAnalyst::CodeOp[1];
+	size_ = 1;
 }
 
 CodeBuffer::~CodeBuffer()

@@ -85,6 +85,12 @@ void Jit64AsmRoutineManager::Generate()
 			dispatcherNoCheck = GetCodePtr();
 			MOV(32, R(RSCRATCH), PPCSTATE(pc));
 
+			PUSH(RSCRATCH);
+			ABI_PushRegistersAndAdjustStack({}, 0);
+			ABI_CallFunctionR(reinterpret_cast<void *>(&EmuCodeBlock::HandleInstructionCache), RSCRATCH);
+			ABI_PopRegistersAndAdjustStack({}, 0);
+			POP(RSCRATCH);
+
 			u64 icache = (u64)jit->GetBlockCache()->iCache.data();
 			u64 icacheVmem = (u64)jit->GetBlockCache()->iCacheVMEM.data();
 			u64 icacheEx = (u64)jit->GetBlockCache()->iCacheEx.data();

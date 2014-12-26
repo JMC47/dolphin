@@ -883,7 +883,7 @@ BitSet32 Jit64::CallerSavedRegistersInUse()
 
 void Jit64::EnableBlockLink()
 {
-	jo.enableBlocklink = true;
+	jo.enableBlocklink = false;
 	if (SConfig::GetInstance().m_LocalCoreStartupParameter.bJITNoBlockLinking)
 		jo.enableBlocklink = false;
 }
