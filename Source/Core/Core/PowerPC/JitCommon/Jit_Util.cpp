@@ -1080,15 +1080,25 @@ void EmuCodeBlock::JitClearCA()
 	MOV(8, PPCSTATE(xer_ca), Imm8(0));
 }
 
+u16 blocklens[0x8000000];
+
 bool EmuCodeBlock::HandleInstructionCache(u32 address)
 {
 	static u32 data[0x8000000];
-	u32 inst = Memory::Read_Opcode(address);
-	if (inst && data[(address & 0x1fffffff) >> 2] == inst)
-		return true;
-	data[(address & 0x1fffffff) >> 2] = inst;
-	JitInterface::InvalidateICache(address, 4, false);
-	return false;
+	int startidx = (address & 0x1fffffff) >> 2;
+	bool okay = true;
+	for (int i = 0; i < blocklens[startidx]; i++)
+	{
+		int addr = address + i * 4;
+		int idx = startidx + i;
+		u32 inst = Memory::Read_Opcode(addr);
+		if (inst && data[idx] == inst)
+			continue;
+		data[idx] = inst;
+		JitInterface::InvalidateICache(addr, 4, false);
+		okay = false;
+	}
+	return okay;
 #if 0
 	//u32 len = 32; // fixme
 	static u32 icache_tags[1024];

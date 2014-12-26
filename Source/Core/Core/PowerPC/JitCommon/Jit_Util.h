@@ -45,6 +45,7 @@ static const int FARCODE_SIZE_MMU = 1024 * 1024 * 48;
 // same for the trampoline code cache, because fastmem results in far more backpatches in MMU mode
 static const int TRAMPOLINE_CODE_SIZE = 1024 * 1024 * 8;
 static const int TRAMPOLINE_CODE_SIZE_MMU = 1024 * 1024 * 32;
+extern u16 blocklens[0x8000000];
 
 // Like XCodeBlock but has some utilities for memory access.
 class EmuCodeBlock : public Gen::X64CodeBlock

@@ -637,6 +637,7 @@ const u8* Jit64::DoJit(u32 em_address, PPCAnalyst::CodeBuffer *code_buf, JitBloc
 	}
 
 	// Translate instructions
+	blocklens[(js.blockStart & 0x1fffffff) >> 2] = code_block.m_num_instructions;
 	for (u32 i = 0; i < code_block.m_num_instructions; i++)
 	{
 		js.compilerPC = ops[i].address;
@@ -890,7 +891,7 @@ void Jit64::EnableBlockLink()
 
 void Jit64::EnableOptimization()
 {
-	analyzer.SetOption(PPCAnalyst::PPCAnalyzer::OPTION_CONDITIONAL_CONTINUE);
+	//analyzer.SetOption(PPCAnalyst::PPCAnalyzer::OPTION_CONDITIONAL_CONTINUE);
 	analyzer.SetOption(PPCAnalyst::PPCAnalyzer::OPTION_BRANCH_MERGE);
 	analyzer.SetOption(PPCAnalyst::PPCAnalyzer::OPTION_CROR_MERGE);
 	analyzer.SetOption(PPCAnalyst::PPCAnalyzer::OPTION_CARRY_MERGE);
