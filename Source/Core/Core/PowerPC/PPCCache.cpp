@@ -154,16 +154,10 @@ namespace PowerPC
 		return res;
 	}
 
-	u32 InstructionCache::ReadInstructions(u32* dst, u32 addr)
+	u8 *InstructionCache::ReadInstructionCacheline(u32 addr)
 	{
-		u32 ctr = 0;
-		u32 addrEnd = (addr + 0x20)&~0x1f;
 		if (!HID0.ICE)
-		{
-			for (u32 curAddr = addr; curAddr < addrEnd; curAddr += 4, ctr++)
-				dst[ctr] = Memory::ReadUnchecked_U32(curAddr);
-			return ctr;
-		}
+			return Memory::GetPointer(addr);
 		u32 set = (addr >> 5) & 0x7f;
 		u32 tag = addr >> 12;
 
@@ -184,18 +178,14 @@ namespace PowerPC
 		if (t == 0xff) // load to the cache
 		{
 			if (HID0.ILOCK) // instruction cache is locked
-			{
-				for (u32 curAddr = addr; curAddr < addrEnd; curAddr += 4, ctr++)
-					dst[ctr] = Memory::ReadUnchecked_U32(curAddr);
-				return ctr;
-			}
+				return Memory::GetPointer(addr);
 			// select a way
 			if (valid[set] != 0xff)
 				t = way_from_valid[valid[set]];
 			else
 				t = way_from_plru[plru[set]];
 			// load
-			Memory::CopyFromEmu((u8*)data[set][t], (addr & ~0x1f), 32);
+			Memory::CopyFromEmu((u8*)data[set][t], addr, 32);
 			if (valid[set] & (1 << t))
 			{
 				if (tags[set][t] & (ICACHE_VMEM_BIT >> 12))
@@ -217,12 +207,7 @@ namespace PowerPC
 		}
 		// update plru
 		plru[set] = (plru[set] & ~s_plru_mask[t]) | s_plru_value[t];
-
-		u32 loc = (addr >> 2) & 7;
-		u32 count = (addrEnd - addr) / 4;
-		for (; ctr < count; ctr++, loc++)
-			dst[ctr] = Common::swap32(data[set][t][loc]);
-		return ctr;
+		return (u8*)data[set][t];
 	}
 
 }

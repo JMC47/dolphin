@@ -1090,24 +1090,24 @@ bool EmuCodeBlock::HandleInstructionCache(u32 address)
 	int len = blocklens[startidx];
 	if (!len)
 		return true;
-	for (int i = 0; i < len;)
+	len += (address & 0x1f) >> 2;
+	address &= ~0x1f;
+	startidx &= ~7;
+	for (int i = 0; i < len; i += 8)
 	{
-		u32 insts[8];
 		int addr = address + i * 4;
-		int instsRead = Memory::Read_Opcodes(insts, addr);
-		if (!instsRead)
+		u8* insts = Memory::Read_Opcode_Cacheline(addr);
+		if (!insts)
 		{
-			PanicAlert("No instructions read at address %x", addr);
+			PanicAlert("Opcode read failure!\n");
 			return false;
 		}
-		int instsToCheck = std::min(instsRead, len - i);
-		if (!memcmp(&data[startidx + i], insts, instsToCheck*4))
+		if (memcmp(&data[startidx + i], insts, 32))
 		{
-			memcpy(&data[startidx + i], insts, instsToCheck*4);
+			memcpy(&data[startidx + i], insts, 32);
 			JitInterface::InvalidateICache(addr, 32, false);
 			okay = false;
 		}
-		i += instsToCheck;
 	}
 	return okay;
 #if 0

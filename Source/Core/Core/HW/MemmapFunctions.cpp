@@ -318,13 +318,13 @@ u32 Read_Opcode(u32 address)
 	return PowerPC::ppcState.iCache.ReadInstruction(address);
 }
 
-u32 Read_Opcodes(u32 *dst, u32 addr)
+u8* Read_Opcode_Cacheline(u32 addr)
 {
 	if (addr == 0x00000000)
 	{
 		// FIXME use assert?
 		PanicAlert("Program tried to read an opcode from [00000000]. It has crashed.");
-		return 0x00000000;
+		return NULL;
 	}
 
 	if (SConfig::GetInstance().m_LocalCoreStartupParameter.bMMU &&
@@ -335,7 +335,7 @@ u32 Read_Opcodes(u32 *dst, u32 addr)
 		if (tlb_addr == 0)
 		{
 			GenerateISIException(addr);
-			return 0;
+			return NULL;
 		}
 		else
 		{
@@ -343,7 +343,7 @@ u32 Read_Opcodes(u32 *dst, u32 addr)
 		}
 	}
 
-	return PowerPC::ppcState.iCache.ReadInstructions(dst, addr);
+	return PowerPC::ppcState.iCache.ReadInstructionCacheline(addr);
 }
 
 static __forceinline void Memcheck(u32 address, u32 var, bool write, int size)
