@@ -1087,16 +1087,27 @@ bool EmuCodeBlock::HandleInstructionCache(u32 address)
 	static u32 data[0x8000000];
 	int startidx = (address & 0x1fffffff) >> 2;
 	bool okay = true;
-	for (int i = 0; i < blocklens[startidx]; i++)
+	int len = blocklens[startidx];
+	if (!len)
+		return true;
+	for (int i = 0; i < len;)
 	{
+		u32 insts[8];
 		int addr = address + i * 4;
-		int idx = startidx + i;
-		u32 inst = Memory::Read_Opcode(addr);
-		if (inst && data[idx] == inst)
-			continue;
-		data[idx] = inst;
-		JitInterface::InvalidateICache(addr, 4, false);
-		okay = false;
+		int instsRead = Memory::Read_Opcodes(insts, addr);
+		if (!instsRead)
+		{
+			PanicAlert("No instructions read at address %x", addr);
+			return false;
+		}
+		int instsToCheck = std::min(instsRead, len - i);
+		if (!memcmp(&data[startidx + i], insts, instsToCheck*4))
+		{
+			memcpy(&data[startidx + i], insts, instsToCheck*4);
+			JitInterface::InvalidateICache(addr, 32, false);
+			okay = false;
+		}
+		i += instsToCheck;
 	}
 	return okay;
 #if 0

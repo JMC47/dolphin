@@ -154,4 +154,75 @@ namespace PowerPC
 		return res;
 	}
 
+	u32 InstructionCache::ReadInstructions(u32* dst, u32 addr)
+	{
+		u32 ctr = 0;
+		u32 addrEnd = (addr + 0x20)&~0x1f;
+		if (!HID0.ICE)
+		{
+			for (u32 curAddr = addr; curAddr < addrEnd; curAddr += 4, ctr++)
+				dst[ctr] = Memory::ReadUnchecked_U32(curAddr);
+			return ctr;
+		}
+		u32 set = (addr >> 5) & 0x7f;
+		u32 tag = addr >> 12;
+
+		u32 t;
+		if (addr & ICACHE_VMEM_BIT)
+		{
+			t = lookup_table_vmem[(addr >> 5) & 0xfffff];
+		}
+		else if (addr & ICACHE_EXRAM_BIT)
+		{
+			t = lookup_table_ex[(addr >> 5) & 0x1fffff];
+		}
+		else
+		{
+			t = lookup_table[(addr >> 5) & 0xfffff];
+		}
+
+		if (t == 0xff) // load to the cache
+		{
+			if (HID0.ILOCK) // instruction cache is locked
+			{
+				for (u32 curAddr = addr; curAddr < addrEnd; curAddr += 4, ctr++)
+					dst[ctr] = Memory::ReadUnchecked_U32(curAddr);
+				return ctr;
+			}
+			// select a way
+			if (valid[set] != 0xff)
+				t = way_from_valid[valid[set]];
+			else
+				t = way_from_plru[plru[set]];
+			// load
+			Memory::CopyFromEmu((u8*)data[set][t], (addr & ~0x1f), 32);
+			if (valid[set] & (1 << t))
+			{
+				if (tags[set][t] & (ICACHE_VMEM_BIT >> 12))
+					lookup_table_vmem[((tags[set][t] << 7) | set) & 0xfffff] = 0xff;
+				else if (tags[set][t] & (ICACHE_EXRAM_BIT >> 12))
+					lookup_table_ex[((tags[set][t] << 7) | set) & 0x1fffff] = 0xff;
+				else
+					lookup_table[((tags[set][t] << 7) | set) & 0xfffff] = 0xff;
+			}
+
+			if (addr & ICACHE_VMEM_BIT)
+				lookup_table_vmem[(addr >> 5) & 0xfffff] = t;
+			else if (addr & ICACHE_EXRAM_BIT)
+				lookup_table_ex[(addr >> 5) & 0x1fffff] = t;
+			else
+				lookup_table[(addr >> 5) & 0xfffff] = t;
+			tags[set][t] = tag;
+			valid[set] |= (1 << t);
+		}
+		// update plru
+		plru[set] = (plru[set] & ~s_plru_mask[t]) | s_plru_value[t];
+
+		u32 loc = (addr >> 2) & 7;
+		u32 count = (addrEnd - addr) / 4;
+		for (; ctr < count; ctr++, loc++)
+			dst[ctr] = Common::swap32(data[set][t][loc]);
+		return ctr;
+	}
+
 }

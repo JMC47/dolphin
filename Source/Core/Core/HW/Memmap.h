@@ -84,6 +84,7 @@ bool IsRAMAddress(const u32 address, bool allow_locked_cache = false, bool allow
 
 // used by interpreter to read instructions, uses iCache
 u32 Read_Opcode(const u32 address);
+u32 Read_Opcodes(u32* dst, u32 addr);
 // this is used by Debugger a lot.
 // For now, just reads from memory!
 u32 Read_Instruction(const u32 address);

@@ -318,6 +318,34 @@ u32 Read_Opcode(u32 address)
 	return PowerPC::ppcState.iCache.ReadInstruction(address);
 }
 
+u32 Read_Opcodes(u32 *dst, u32 addr)
+{
+	if (addr == 0x00000000)
+	{
+		// FIXME use assert?
+		PanicAlert("Program tried to read an opcode from [00000000]. It has crashed.");
+		return 0x00000000;
+	}
+
+	if (SConfig::GetInstance().m_LocalCoreStartupParameter.bMMU &&
+		(addr & ADDR_MASK_MEM1))
+	{
+		// TODO: Check for MSR instruction address translation flag before translating
+		u32 tlb_addr = Memory::TranslateAddress<FLAG_OPCODE>(addr);
+		if (tlb_addr == 0)
+		{
+			GenerateISIException(addr);
+			return 0;
+		}
+		else
+		{
+			addr = tlb_addr;
+		}
+	}
+
+	return PowerPC::ppcState.iCache.ReadInstructions(dst, addr);
+}
+
 static __forceinline void Memcheck(u32 address, u32 var, bool write, int size)
 {
 #ifdef ENABLE_MEM_CHECK
