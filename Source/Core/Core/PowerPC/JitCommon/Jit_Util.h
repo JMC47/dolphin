@@ -48,6 +48,30 @@ static const int TRAMPOLINE_CODE_SIZE_MMU = 1024 * 1024 * 32;
 extern u16 blocklens[0x8000000];
 extern u8 blockdata[0x20000000];
 
+static inline u64 crccode(u32* src, int insts)
+{
+	int i = 0;
+	u64 res = 0;
+	if (insts >= 4)
+	{
+		u64 val[2] = { *(u64*)&src[0], *(u64*)&src[2] };
+		src += 4;
+		insts -= 4;
+		while (insts >= 4)
+		{
+			val[0] = _mm_crc32_u64(val[0], *(u64*)&src[i+0]);
+			val[1] = _mm_crc32_u64(val[1], *(u64*)&src[i+2]);
+			src += 4;
+			insts -= 4;
+		} 
+		res = _mm_crc32_u64(val[0], val[1]);
+	}
+
+	for (int i = 0; i < insts; i++)
+		res = _mm_crc32_u64(res, src[i]);
+	return res;
+}
+
 // Like XCodeBlock but has some utilities for memory access.
 class EmuCodeBlock : public Gen::X64CodeBlock
 {

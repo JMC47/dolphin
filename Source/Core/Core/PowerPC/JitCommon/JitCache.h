@@ -39,6 +39,7 @@ struct JitBlock
 	u32 originalAddress;
 	u32 codeSize;
 	u32 originalSize;
+	u64 crc;
 	int runCount;  // for profiling.
 
 	bool invalid;

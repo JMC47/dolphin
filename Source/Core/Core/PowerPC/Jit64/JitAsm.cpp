@@ -54,10 +54,14 @@ inline bool memcmp_insts(u32* src1, u32* src2, size_t insts)
 bool check_cache(JitBlock *b)
 {
 	u32 address = b->originalAddress;
-	u32* code = (u32*)&blockdata[address & 0x1fffffff];
+	u8* memaddress = Memory::base + address;
+	//u8* memaddress = Memory::GetPointer(address);
+	//u32* code = (u32*)&blockdata[address & 0x1fffffff];
 	int size = b->originalSize;
 	//if (!memcmp_insts((u32*)(Memory::base + address), code, size))
-	if (memcmp((u8*)(Memory::base + address), code, size*4))
+	//if (memcmp(memaddress, code, size * 4))
+	u64 crc = crccode((u32*)memaddress, size);
+	if (crc != b->crc)
 	{
 		JitInterface::InvalidateICache(address, size*4, false);
 		return false;
@@ -214,7 +218,7 @@ void Jit64AsmRoutineManager::Generate()
 			ABI_PushRegistersAndAdjustStack({}, 0);
 			ABI_CallFunctionR((void *)&check_cache, ABI_PARAM1);
 			ABI_PopRegistersAndAdjustStack({}, 0);
-			TEST(32, R(RSCRATCH), R(RSCRATCH));
+			TEST(8, R(ABI_RETURN), R(ABI_RETURN));
 			FixupBranch icachefail = J_CC(CC_Z);
 			MOV(32, R(RSCRATCH), R(R14));
 

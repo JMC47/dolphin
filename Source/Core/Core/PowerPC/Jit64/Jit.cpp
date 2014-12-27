@@ -639,7 +639,8 @@ const u8* Jit64::DoJit(u32 em_address, PPCAnalyst::CodeBuffer *code_buf, JitBloc
 
 	// Translate instructions
 	//blocklens[(js.blockStart & 0x1fffffff) >> 2] = code_block.m_num_instructions;
-	memcpy(&blockdata[em_address & 0x1fffffff], Memory::GetPointer(em_address), code_block.m_num_instructions * 4);
+	//memcpy(&blockdata[em_address & 0x1fffffff], Memory::GetPointer(em_address), code_block.m_num_instructions * 4);
+	b->crc = crccode((u32*)Memory::GetPointer(em_address), code_block.m_num_instructions);
 	for (u32 i = 0; i < code_block.m_num_instructions; i++)
 	{
 		js.compilerPC = ops[i].address;
