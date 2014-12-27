@@ -17,6 +17,7 @@
 #include "Core/HW/ProcessorInterface.h"
 #include "Core/PowerPC/JitInterface.h"
 #include "Core/PowerPC/Profiler.h"
+#include "Core/PowerPC/JitInterface.h"
 #include "Core/PowerPC/Jit64/Jit.h"
 #include "Core/PowerPC/Jit64/Jit64_Tables.h"
 #include "Core/PowerPC/Jit64/JitAsm.h"
@@ -637,7 +638,8 @@ const u8* Jit64::DoJit(u32 em_address, PPCAnalyst::CodeBuffer *code_buf, JitBloc
 	}
 
 	// Translate instructions
-	blocklens[(js.blockStart & 0x1fffffff) >> 2] = code_block.m_num_instructions;
+	//blocklens[(js.blockStart & 0x1fffffff) >> 2] = code_block.m_num_instructions;
+	memcpy(&blockdata[em_address & 0x1fffffff], Memory::GetPointer(em_address), code_block.m_num_instructions * 4);
 	for (u32 i = 0; i < code_block.m_num_instructions; i++)
 	{
 		js.compilerPC = ops[i].address;
@@ -891,7 +893,7 @@ void Jit64::EnableBlockLink()
 
 void Jit64::EnableOptimization()
 {
-	//analyzer.SetOption(PPCAnalyst::PPCAnalyzer::OPTION_CONDITIONAL_CONTINUE);
+	analyzer.SetOption(PPCAnalyst::PPCAnalyzer::OPTION_CONDITIONAL_CONTINUE);
 	analyzer.SetOption(PPCAnalyst::PPCAnalyzer::OPTION_BRANCH_MERGE);
 	analyzer.SetOption(PPCAnalyst::PPCAnalyzer::OPTION_CROR_MERGE);
 	analyzer.SetOption(PPCAnalyst::PPCAnalyzer::OPTION_CARRY_MERGE);

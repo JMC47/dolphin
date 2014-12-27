@@ -85,6 +85,11 @@ using namespace Gen;
 		Init();
 	}
 
+	JitBlock *JitBaseBlockCache::GetBlocks()
+	{
+		return blocks.data();
+	}
+
 	JitBlock *JitBaseBlockCache::GetBlock(int no)
 	{
 		return &blocks[no];

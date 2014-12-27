@@ -46,6 +46,7 @@ static const int FARCODE_SIZE_MMU = 1024 * 1024 * 48;
 static const int TRAMPOLINE_CODE_SIZE = 1024 * 1024 * 8;
 static const int TRAMPOLINE_CODE_SIZE_MMU = 1024 * 1024 * 32;
 extern u16 blocklens[0x8000000];
+extern u8 blockdata[0x20000000];
 
 // Like XCodeBlock but has some utilities for memory access.
 class EmuCodeBlock : public Gen::X64CodeBlock

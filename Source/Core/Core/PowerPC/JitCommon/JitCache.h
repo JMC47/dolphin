@@ -144,6 +144,7 @@ public:
 
 	// Code Cache
 	JitBlock *GetBlock(int block_num);
+	JitBlock *JitBaseBlockCache::GetBlocks();
 	int GetNumBlocks() const;
 	const u8 **GetCodePointers();
 	std::array<u8, JIT_ICACHE_SIZE>   iCache;

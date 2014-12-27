@@ -1081,10 +1081,22 @@ void EmuCodeBlock::JitClearCA()
 }
 
 u16 blocklens[0x8000000];
+u8 blockdata[0x20000000];
 
 bool EmuCodeBlock::HandleInstructionCache(u32 address)
 {
-	static u32 data[0x8000000];
+	u8* curMem = Memory::GetPointer(address);
+	u8* jitMem = &blockdata[address & 0x1fffffff];
+	int len = blocklens[(address & 0x1fffffff) >> 2];
+	if (!memcmp(curMem, jitMem, len*4))
+	{
+		memcpy(jitMem, curMem, len*4);
+		JitInterface::InvalidateICache(address, len*4, false);
+		return false;
+	}
+	return true;
+#if 0
+	static u32 data[0x20000000];
 	int startidx = (address & 0x1fffffff) >> 2;
 	bool okay = true;
 	int len = blocklens[startidx];
@@ -1110,40 +1122,5 @@ bool EmuCodeBlock::HandleInstructionCache(u32 address)
 		}
 	}
 	return okay;
-#if 0
-	//u32 len = 32; // fixme
-	static u32 icache_tags[1024];
-	static u32 data[0x8000000];
-	const int associativity = 8;
-	u32 start_block = address >> 5;
-	u32 end_block = (address + 0) >> 5;
-	bool lookup_success = true;
-
-	for (u32 i = start_block; i <= end_block; i++)
-	{
-		u32 tag = i >> 7;
-		u32 index = i & 0x7F;
-		bool found = false;
-		for (int j = 0; j < 8; j++)
-			if (icache_tags[index + j * 128] == tag)
-			{
-				found = true;
-				break;
-			}
-		if (!found)
-		{
-			u32 inst = Memory::Read_U32(address);
-			if (data[(address & 0x1fffffff) >> 2] != inst)
-			{
-				data[(address & 0x1fffffff) >> 2] = inst;
-				lookup_success = false;
-				int newset = rand() & 7; // random LRU??? I have no idea what the CPU does
-				icache_tags[index + newset * 128] = tag;
-				JitInterface::InvalidateICache(start_block << 5, 32, false);
-			}
-		}
-	}
-
-	return lookup_success;
 #endif
 }
