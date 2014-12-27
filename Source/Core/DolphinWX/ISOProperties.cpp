@@ -404,11 +404,13 @@ void CISOProperties::CreateGUIControls(bool IsWad)
 	SkipIdle = new wxCheckBox(m_GameConfig, ID_IDLESKIP, _("Enable Idle Skipping"), wxDefaultPosition, wxDefaultSize, GetElementStyle("Core", "SkipIdle"));
 	MMU = new wxCheckBox(m_GameConfig, ID_MMU, _("Enable MMU"), wxDefaultPosition, wxDefaultSize, GetElementStyle("Core", "MMU"));
 	MMU->SetToolTip(_("Enables the Memory Management Unit, needed for some games. (ON = Compatible, OFF = Fast)"));
-	BAT = new wxCheckBox(m_GameConfig, ID_MMU, _("Enable BAT"), wxDefaultPosition, wxDefaultSize, GetElementStyle("Core", "BAT"));
+	BAT = new wxCheckBox(m_GameConfig, ID_BAT, _("Enable BAT"), wxDefaultPosition, wxDefaultSize, GetElementStyle("Core", "BAT"));
 	BAT->SetToolTip(_("Enables Block Address Translation, needed for a few games. Requires MMU. (ON = Compatible, OFF = Fast)"));
+	ICache = new wxCheckBox(m_GameConfig, ID_ICACHE, _("Enable ICache emulation"), wxDefaultPosition, wxDefaultSize, GetElementStyle("Core", "MMU"));
+	ICache->SetToolTip(_("Enables experimental instruction cache emulation, needed for a few games (mostly fan mods/hacks). (ON = Compatible, OFF = Fast)"));
 	DCBZOFF = new wxCheckBox(m_GameConfig, ID_DCBZOFF, _("Skip DCBZ clearing"), wxDefaultPosition, wxDefaultSize, GetElementStyle("Core", "DCBZ"));
 	DCBZOFF->SetToolTip(_("Bypass the clearing of the data cache by the DCBZ instruction. Usually leave this option disabled."));
-	FPRF = new wxCheckBox(m_GameConfig, ID_MMU, _("Enable FPRF"), wxDefaultPosition, wxDefaultSize, GetElementStyle("Core", "FPRF"));
+	FPRF = new wxCheckBox(m_GameConfig, ID_FPRF, _("Enable FPRF"), wxDefaultPosition, wxDefaultSize, GetElementStyle("Core", "FPRF"));
 	FPRF->SetToolTip(_("Enables Floating Point Result Flag calculation, needed for a few games. (ON = Compatible, OFF = Fast)"));
 	VBeam = new wxCheckBox(m_GameConfig, ID_VBEAM, _("VBeam Speed Hack"), wxDefaultPosition, wxDefaultSize, GetElementStyle("Core", "VBeam"));
 	VBeam->SetToolTip(_("Doubles the emulated GPU clock rate. May speed up some games (ON = Fast, OFF = Compatible)"));
@@ -469,6 +471,7 @@ void CISOProperties::CreateGUIControls(bool IsWad)
 	sbCoreOverrides->Add(SkipIdle, 0, wxLEFT, 5);
 	sbCoreOverrides->Add(BAT, 0, wxLEFT, 5);
 	sbCoreOverrides->Add(MMU, 0, wxLEFT, 5);
+	sbCoreOverrides->Add(ICache, 0, wxLEFT, 5);
 	sbCoreOverrides->Add(DCBZOFF, 0, wxLEFT, 5);
 	sbCoreOverrides->Add(FPRF, 0, wxLEFT, 5);
 	sbCoreOverrides->Add(VBeam, 0, wxLEFT, 5);
@@ -1061,6 +1064,7 @@ void CISOProperties::LoadGameConfig()
 	SetCheckboxValueFromGameini("Core", "SkipIdle", SkipIdle);
 	SetCheckboxValueFromGameini("Core", "MMU", MMU);
 	SetCheckboxValueFromGameini("Core", "BAT", BAT);
+	SetCheckboxValueFromGameini("Core", "ICache", ICache);
 	SetCheckboxValueFromGameini("Core", "DCBZ", DCBZOFF);
 	SetCheckboxValueFromGameini("Core", "FPRF", FPRF);
 	SetCheckboxValueFromGameini("Core", "VBeam", VBeam);
@@ -1158,6 +1162,7 @@ bool CISOProperties::SaveGameConfig()
 	SaveGameIniValueFrom3StateCheckbox("Core", "SkipIdle", SkipIdle);
 	SaveGameIniValueFrom3StateCheckbox("Core", "MMU", MMU);
 	SaveGameIniValueFrom3StateCheckbox("Core", "BAT", BAT);
+	SaveGameIniValueFrom3StateCheckbox("Core", "ICache", ICache);
 	SaveGameIniValueFrom3StateCheckbox("Core", "DCBZ", DCBZOFF);
 	SaveGameIniValueFrom3StateCheckbox("Core", "FPRF", FPRF);
 	SaveGameIniValueFrom3StateCheckbox("Core", "VBeam", VBeam);

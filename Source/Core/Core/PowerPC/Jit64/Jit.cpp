@@ -17,7 +17,6 @@
 #include "Core/HW/ProcessorInterface.h"
 #include "Core/PowerPC/JitInterface.h"
 #include "Core/PowerPC/Profiler.h"
-#include "Core/PowerPC/JitInterface.h"
 #include "Core/PowerPC/Jit64/Jit.h"
 #include "Core/PowerPC/Jit64/Jit64_Tables.h"
 #include "Core/PowerPC/Jit64/JitAsm.h"
@@ -636,11 +635,13 @@ const u8* Jit64::DoJit(u32 em_address, PPCAnalyst::CodeBuffer *code_buf, JitBloc
 			js.assumeNoPairedQuantize = true;
 		}
 	}
+	js.compilerPC = nextPC;
+
+	// Hash data for icache emulation
+	if (SConfig::GetInstance().m_LocalCoreStartupParameter.bICache)
+		b->crc = crccode((u32*)Memory::GetPointer(em_address), code_block.m_num_instructions);
 
 	// Translate instructions
-	//blocklens[(js.blockStart & 0x1fffffff) >> 2] = code_block.m_num_instructions;
-	//memcpy(&blockdata[em_address & 0x1fffffff], Memory::GetPointer(em_address), code_block.m_num_instructions * 4);
-	b->crc = crccode((u32*)Memory::GetPointer(em_address), code_block.m_num_instructions);
 	for (u32 i = 0; i < code_block.m_num_instructions; i++)
 	{
 		js.compilerPC = ops[i].address;
@@ -887,8 +888,9 @@ BitSet32 Jit64::CallerSavedRegistersInUse()
 
 void Jit64::EnableBlockLink()
 {
-	jo.enableBlocklink = false;
-	if (SConfig::GetInstance().m_LocalCoreStartupParameter.bJITNoBlockLinking)
+	jo.enableBlocklink = true;
+	if (SConfig::GetInstance().m_LocalCoreStartupParameter.bJITNoBlockLinking ||
+		SConfig::GetInstance().m_LocalCoreStartupParameter.bICache)
 		jo.enableBlocklink = false;
 }
 

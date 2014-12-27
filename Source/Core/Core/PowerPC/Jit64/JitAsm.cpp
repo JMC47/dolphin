@@ -18,48 +18,11 @@ static void* s_saved_rsp;
 // dynarec buffer
 // At this offset - 4, there is an int specifying the block number.
 
-inline bool memcmp_insts(u32* src1, u32* src2, size_t insts)
-{
-	int first = insts & 7;
-	u32 accum = 0;
-	switch (first)
-	{
-	case 7: if (src1[6] != src2[6]) return false;
-	case 6: if (src1[5] != src2[5]) return false;
-	case 5: if (src1[4] != src2[4]) return false;
-	case 4: if (src1[3] != src2[3]) return false;
-	case 3: if (src1[2] != src2[2]) return false;
-	case 2: if (src1[1] != src2[1]) return false;
-	case 1: if (src1[0] != src2[0]) return false;
-	default:
-		break;
-	}
-	src1 += first;
-	src2 += first;
-	for (int i = 0; i < (insts >> 3); i++)
-	{
-		__m128i a1 = _mm_loadu_si128((__m128i*)(src1 + i * 8 + 0));
-		__m128i a2 = _mm_loadu_si128((__m128i*)(src1 + i * 8 + 4));
-		__m128i b1 = _mm_loadu_si128((__m128i*)(src2 + i * 8 + 0));
-		__m128i b2 = _mm_loadu_si128((__m128i*)(src2 + i * 8 + 4));
-		a1 = _mm_xor_si128(a1, b1);
-		a2 = _mm_xor_si128(a2, b2);
-		a1 = _mm_or_si128(a1, a2);
-		if (!_mm_testz_si128(a1, a1))
-			return false;
-	}
-	return true;
-}
-
 bool check_cache(JitBlock *b)
 {
 	u32 address = b->originalAddress;
 	u8* memaddress = Memory::base + address;
-	//u8* memaddress = Memory::GetPointer(address);
-	//u32* code = (u32*)&blockdata[address & 0x1fffffff];
 	int size = b->originalSize;
-	//if (!memcmp_insts((u32*)(Memory::base + address), code, size))
-	//if (memcmp(memaddress, code, size * 4))
 	u64 crc = crccode((u32*)memaddress, size);
 	if (crc != b->crc)
 	{
@@ -201,67 +164,23 @@ void Jit64AsmRoutineManager::Generate()
 				SetJumpTarget(exit_vmem);
 
 			TEST(32, R(RSCRATCH), R(RSCRATCH));
-			FixupBranch notfound = J_CC(CC_L, true);
+			FixupBranch notfound = J_CC(CC_L);
 
-			u64 blockPointers = (u64)jit->GetBlockCache()->GetBlocks();
-			/*IMUL(32, RSCRATCH2, R(RSCRATCH), Imm32(sizeof(JitBlock)));
-			MOV(64, R(R13), Imm64(blockPointers));
-			MOV(32, R(ABI_PARAM1), MComplex(R13, RSCRATCH2, SCALE_1, offsetof(JitBlock, originalAddress)));
-			MOV(32, R(ABI_PARAM3), MComplex(R13, RSCRATCH2, SCALE_1, offsetof(JitBlock, originalSize)));
-			MOV(64, R(ABI_PARAM2), MComplex(R13, RSCRATCH2, SCALE_1, offsetof(JitBlock, originalCode)));
-			SHL(32, R(ABI_PARAM3), Imm8(2));
-			ADD(64, R(ABI_PARAM1), R(RMEM));*/
-			MOV(32, R(R14), R(RSCRATCH));
-			IMUL(32, ABI_PARAM1, R(RSCRATCH), Imm32(sizeof(JitBlock)));
-			MOV(64, R(RSCRATCH), Imm64(blockPointers));
-			ADD(64, R(ABI_PARAM1), R(RSCRATCH));
-			ABI_PushRegistersAndAdjustStack({}, 0);
-			ABI_CallFunctionR((void *)&check_cache, ABI_PARAM1);
-			ABI_PopRegistersAndAdjustStack({}, 0);
-			TEST(8, R(ABI_RETURN), R(ABI_RETURN));
-			FixupBranch icachefail = J_CC(CC_Z);
-			MOV(32, R(RSCRATCH), R(R14));
-
-
-			/*MOV(32, R(R8), MComplex(RSCRATCH_EXTRA, RSCRATCH2, SCALE_1, offsetof(JitBlock, originalAddress)));
-			MOV(32, R(R9), MComplex(RSCRATCH_EXTRA, RSCRATCH2, SCALE_1, offsetof(JitBlock, originalSize)));
-			MOV(64, R(R10), MComplex(RSCRATCH_EXTRA, RSCRATCH2, SCALE_1, offsetof(JitBlock, originalCode)));
-			SHL(32, R(R9), Imm8(2));
-
-			XOR(32, R(R11), R(R11));
-			MOV(32, R(R12), R(R9));
-			AND(32, R(R12), Imm8(0x1f));
-
-			// Check until we have a multiple of 32 left
-			const u8 *memcmpLoop1 = GetCodePtr();
-			MOV(32, R(R13), MComplex(RMEM, R8, SCALE_1, 0));
-			CMP(32, R(R13), MatR(R10));
-			FixupBranch icachefail1 = J_CC(CC_NZ, true);
-			ADD(32, R(R8), Imm8(4));
-			ADD(64, R(R10), Imm8(4));
-			SUB(32, R(R12), Imm8(4));
-			J_CC(CC_G, memcmpLoop1);
-
-			AND(32, R(R9), Imm32(~0x1f));
-			FixupBranch doneCheck = J_CC(CC_Z);
-
-			// Do the rest
-			const u8 *memcmpLoop2 = GetCodePtr();
-			MOVDQU(XMM0, MComplex(RMEM, R8, SCALE_1, 0));
-			MOVDQU(XMM1, MComplex(RMEM, R8, SCALE_1, 16));
-			MOVDQU(XMM2, MComplex(R10, R11, SCALE_1, 0));
-			MOVDQU(XMM3, MComplex(R10, R11, SCALE_1, 16));
-			PXOR(XMM0, R(XMM2));
-			PXOR(XMM1, R(XMM3));
-			POR(XMM0, R(XMM1));
-			PTEST(XMM1, R(XMM1));
-			FixupBranch icachefail2 = J_CC(CC_NZ);
-			ADD(32, R(R8), Imm8(32));
-			ADD(32, R(R11), Imm8(32));
-			CMP(32, R(R11), R(R9));
-			J_CC(CC_GE, memcmpLoop2);
-
-			SetJumpTarget(doneCheck);*/
+			FixupBranch icachefail;
+			if (SConfig::GetInstance().m_LocalCoreStartupParameter.bICache)
+			{
+				u64 blockPointers = (u64)jit->GetBlockCache()->GetBlocks();
+				MOV(32, R(R14), R(RSCRATCH));
+				IMUL(32, ABI_PARAM1, R(RSCRATCH), Imm32(sizeof(JitBlock)));
+				MOV(64, R(RSCRATCH), Imm64(blockPointers));
+				ADD(64, R(ABI_PARAM1), R(RSCRATCH));
+				ABI_PushRegistersAndAdjustStack({}, 0);
+				ABI_CallFunctionR((void *)&check_cache, ABI_PARAM1);
+				ABI_PopRegistersAndAdjustStack({}, 0);
+				TEST(8, R(ABI_RETURN), R(ABI_RETURN));
+				icachefail = J_CC(CC_Z);
+				MOV(32, R(RSCRATCH), R(R14));
+			}
 
 			//grab from list and jump to it
 			u64 codePointers = (u64)jit->GetBlockCache()->GetCodePointers();
@@ -275,8 +194,8 @@ void Jit64AsmRoutineManager::Generate()
 				JMPptr(MComplex(RSCRATCH2, RSCRATCH, 8, 0));
 			}
 			SetJumpTarget(notfound);
-			SetJumpTarget(icachefail);
-		//	SetJumpTarget(icachefail2);
+			if (SConfig::GetInstance().m_LocalCoreStartupParameter.bICache)
+				SetJumpTarget(icachefail);
 
 			//Ok, no block, let's jit
 			ABI_PushRegistersAndAdjustStack({}, 0);

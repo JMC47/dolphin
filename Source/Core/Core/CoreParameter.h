@@ -183,6 +183,7 @@ struct SCoreStartupParameter
 
 	bool bBAT;
 	bool bMMU;
+	bool bICache;
 	bool bDCBZOFF;
 	int iBBDumpPort;
 	bool bVBeamSpeedHack;

@@ -69,7 +69,7 @@ private:
 	DECLARE_EVENT_TABLE();
 
 	// Core
-	wxCheckBox *CPUThread, *SkipIdle, *MMU, *BAT, *DCBZOFF, *FPRF;
+	wxCheckBox *CPUThread, *SkipIdle, *MMU, *BAT, *ICache, *DCBZOFF, *FPRF;
 	wxCheckBox *VBeam, *SyncGPU, *FastDiscSpeed, *BlockMerging, *DSPHLE;
 
 	wxArrayString arrayStringFor_GPUDeterminism;
@@ -135,6 +135,9 @@ private:
 		ID_USEDUALCORE,
 		ID_IDLESKIP,
 		ID_MMU,
+		ID_BAT,
+		ID_FPRF,
+		ID_ICACHE,
 		ID_DCBZOFF,
 		ID_VBEAM,
 		ID_SYNCGPU,

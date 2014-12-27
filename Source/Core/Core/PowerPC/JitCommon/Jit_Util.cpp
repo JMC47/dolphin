@@ -10,7 +10,6 @@
 #include "Core/HW/MMIO.h"
 #include "Core/PowerPC/JitCommon/Jit_Util.h"
 #include "Core/PowerPC/JitCommon/JitBase.h"
-#include "Core/PowerPC/JitInterface.h"
 
 using namespace Gen;
 
@@ -1078,49 +1077,4 @@ void EmuCodeBlock::JitSetCAIf(CCFlags conditionCode)
 void EmuCodeBlock::JitClearCA()
 {
 	MOV(8, PPCSTATE(xer_ca), Imm8(0));
-}
-
-u16 blocklens[0x8000000];
-u8 blockdata[0x20000000];
-
-bool EmuCodeBlock::HandleInstructionCache(u32 address)
-{
-	u8* curMem = Memory::GetPointer(address);
-	u8* jitMem = &blockdata[address & 0x1fffffff];
-	int len = blocklens[(address & 0x1fffffff) >> 2];
-	if (!memcmp(curMem, jitMem, len*4))
-	{
-		memcpy(jitMem, curMem, len*4);
-		JitInterface::InvalidateICache(address, len*4, false);
-		return false;
-	}
-	return true;
-#if 0
-	static u32 data[0x20000000];
-	int startidx = (address & 0x1fffffff) >> 2;
-	bool okay = true;
-	int len = blocklens[startidx];
-	if (!len)
-		return true;
-	len += (address & 0x1f) >> 2;
-	address &= ~0x1f;
-	startidx &= ~7;
-	for (int i = 0; i < len; i += 8)
-	{
-		int addr = address + i * 4;
-		u8* insts = Memory::Read_Opcode_Cacheline(addr);
-		if (!insts)
-		{
-			PanicAlert("Opcode read failure!\n");
-			return false;
-		}
-		if (memcmp(&data[startidx + i], insts, 32))
-		{
-			memcpy(&data[startidx + i], insts, 32);
-			JitInterface::InvalidateICache(addr, 32, false);
-			okay = false;
-		}
-	}
-	return okay;
-#endif
 }
