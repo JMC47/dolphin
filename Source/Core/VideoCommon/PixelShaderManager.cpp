@@ -184,12 +184,11 @@ void PixelShaderManager::SetEfbScaleChanged()
 	s_bViewPortChanged = true;
 }
 
-void PixelShaderManager::SetZSlope(float dfdx, float dfdy, float f0)
+void PixelShaderManager::SetZSlope(float dfdx, float dfdy, float f0, unsigned int layer)
 {
-	constants.zslope[0] = dfdx;
-	constants.zslope[1] = dfdy;
-	constants.zslope[2] = f0;
-	constants.zslope[3] = 0;
+	constants.zslope[layer * 2] = dfdx;
+	constants.zslope[layer * 2 + 1] = dfdy;
+	constants.efbscale[2 + layer] = f0;
 	dirty = true;
 }
 

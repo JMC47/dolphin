@@ -11,6 +11,7 @@
 #include "Common/MathUtil.h"
 #include "VideoCommon/BPMemory.h"
 #include "VideoCommon/CPMemory.h"
+#include "VideoCommon/GeometryShaderManager.h"
 #include "VideoCommon/RenderBase.h"
 #include "VideoCommon/Statistics.h"
 #include "VideoCommon/VertexManagerBase.h"
@@ -690,10 +691,15 @@ void VertexShaderManager::ResetView()
 	bProjectionChanged = true;
 }
 
-void VertexShaderManager::TransformToClipSpace(const float* data, float *out)
+void VertexShaderManager::TransformToClipSpace(const float* data, float *out, unsigned int eye)
 {
 	const float *world_matrix = (const float *)xfmem.posMatrices + g_main_cp_state.matrix_index_a.PosNormalMtxIdx * 4;
 	const float *proj_matrix = &g_fProjectionMatrix[0];
+	const float shear = proj_matrix[2];
+
+	// For stereoscopy we need to apply a shearing transformation to the projection matrix
+	if (xfmem.projection.type == GX_PERSPECTIVE && g_ActiveConfig.iStereoMode > 0)
+		g_fProjectionMatrix[2] = GeometryShaderManager::constants.stereoparams[eye] * xfmem.viewport.wd;
 
 	float t[3];
 	t[0] = data[0] * world_matrix[0] + data[1] * world_matrix[1] + data[2] * world_matrix[2] + world_matrix[3];
@@ -706,6 +712,9 @@ void VertexShaderManager::TransformToClipSpace(const float* data, float *out)
 	out[1] = t[0] * proj_matrix[4] + t[1] * proj_matrix[5] + t[2] * proj_matrix[6] + proj_matrix[7];
 	out[2] = t[0] * proj_matrix[8] + t[1] * proj_matrix[9] + t[2] * proj_matrix[10] + proj_matrix[11];
 	out[3] = t[0] * proj_matrix[12] + t[1] * proj_matrix[13] + t[2] * proj_matrix[14] + proj_matrix[15];
+
+	// Revert shearing transformation
+	g_fProjectionMatrix[2] = shear;
 }
 
 void VertexShaderManager::DoState(PointerWrap &p)

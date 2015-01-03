@@ -38,7 +38,7 @@ public:
 	// out: 4 floats which will be initialized with the corresponding clip space coordinates
 	// NOTE: g_fProjectionMatrix must be up to date when this is called
 	//		(i.e. VertexShaderManager::SetConstants needs to be called before using this!)
-	static void TransformToClipSpace(const float* data, float *out);
+	static void TransformToClipSpace(const float* data, float *out, unsigned int eye = 0);
 
 	static VertexShaderConstants constants;
 	static bool dirty;

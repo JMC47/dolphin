@@ -381,6 +381,9 @@ static inline void GeneratePixelShader(T& out, DSTALPHA_MODE dstAlphaMode, API_T
 		out.Write("        ) {\n");
 	}
 
+	if (g_ActiveConfig.iStereoMode <= 0)
+		out.Write("\tint layer = 0;\n");
+
 	out.Write("\tint4 c0 = " I_COLORS"[1], c1 = " I_COLORS"[2], c2 = " I_COLORS"[3], prev = " I_COLORS"[0];\n"
 	          "\tint4 rastemp = int4(0, 0, 0, 0), textemp = int4(0, 0, 0, 0), konsttemp = int4(0, 0, 0, 0);\n"
 	          "\tint3 comp16 = int3(1, 256, 0), comp24 = int3(1, 256, 256*256);\n"
@@ -950,9 +953,9 @@ static inline void SampleTexture(T& out, const char *texcoords, const char *texs
 	out.SetConstantsUsed(C_TEXDIMS+texmap,C_TEXDIMS+texmap);
 
 	if (ApiType == API_D3D)
-		out.Write("iround(255.0 * Tex%d.Sample(samp%d, float3(%s.xy * " I_TEXDIMS"[%d].xy, %s))).%s;\n", texmap, texmap, texcoords, texmap, g_ActiveConfig.iStereoMode > 0 ? "layer" : "0.0", texswap);
+		out.Write("iround(255.0 * Tex%d.Sample(samp%d, float3(%s.xy * " I_TEXDIMS"[%d].xy, layer))).%s;\n", texmap, texmap, texcoords, texmap, texswap);
 	else
-		out.Write("iround(255.0 * texture(samp%d, float3(%s.xy * " I_TEXDIMS"[%d].xy, %s))).%s;\n", texmap, texcoords, texmap, g_ActiveConfig.iStereoMode > 0 ? "layer" : "0.0", texswap);
+		out.Write("iround(255.0 * texture(samp%d, float3(%s.xy * " I_TEXDIMS"[%d].xy, layer))).%s;\n", texmap, texcoords, texmap, texswap);
 }
 
 static const char *tevAlphaFuncsTable[] =
@@ -1117,7 +1120,7 @@ static inline void WritePerPixelDepth(T& out, pixel_shader_uid_data* uid_data, A
 		if(ApiType == API_OPENGL)
 			out.Write("\tscreenpos.y = %i - screenpos.y - 1;\n", EFB_HEIGHT);
 
-		out.Write("\tdepth = float(" I_ZSLOPE".z + " I_ZSLOPE".x * screenpos.x + " I_ZSLOPE".y * screenpos.y) / float(0xffffff);\n");
+		out.Write("\tdepth = float(" I_EFBSCALE"[2 + layer] + " I_ZSLOPE"[2 * layer] * screenpos.x + " I_ZSLOPE"[2 * layer + 1] * screenpos.y) / float(0xffffff);\n");
 	}
 	else
 	{
