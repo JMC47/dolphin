@@ -107,6 +107,12 @@ void GeometryShaderManager::SetTexCoordChanged(u8 texmapid)
 	dirty = true;
 }
 
+void GeometryShaderManager::SetZFreezeDepth(float depth)
+{
+	constants.stereoparams[3] = depth;
+	dirty = true;
+}
+
 void GeometryShaderManager::DoState(PointerWrap &p)
 {
 	if (p.GetMode() == PointerWrap::MODE_READ)

@@ -291,5 +291,6 @@ void VertexManager::CalculateZSlope(u32 stride)
 		float slope_f0 = out[2] - (out[0] * slope_dfdx + out[1] * slope_dfdy);
 
 		PixelShaderManager::SetZSlope(slope_dfdx, slope_dfdy, slope_f0, eye);
+		GeometryShaderManager::SetZFreezeDepth(-vtx[2]);
 	}
 }

@@ -23,6 +23,7 @@ public:
 	static void SetProjectionChanged();
 	static void SetLinePtWidthChanged();
 	static void SetTexCoordChanged(u8 texmapid);
+	static void SetZFreezeDepth(float depth);
 
 	static GeometryShaderConstants constants;
 	static bool dirty;

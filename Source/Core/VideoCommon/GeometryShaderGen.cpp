@@ -219,8 +219,11 @@ static inline void GenerateGeometryShader(T& out, u32 primitive_type, API_TYPE A
 		// the depth value. This results in objects at a distance smaller than the convergence
 		// distance to seemingly appear in front of the screen.
 		// This formula is based on page 13 of the "Nvidia 3D Vision Automatic, Best Practices Guide"
-		out.Write("\tf.clipPos.x += " I_STEREOPARAMS"[eye] * (f.clipPos.w - " I_STEREOPARAMS"[2]);\n");
-		out.Write("\tf.pos.x += " I_STEREOPARAMS"[eye] * (f.pos.w - " I_STEREOPARAMS"[2]);\n");
+		uid_data->zfreeze = bpmem.genMode.zfreeze;
+		if (bpmem.genMode.zfreeze)
+			out.Write("\tf.pos.x += " I_STEREOPARAMS"[eye] * (" I_STEREOPARAMS"[3] - " I_STEREOPARAMS"[2]);\n");
+		else
+			out.Write("\tf.pos.x += " I_STEREOPARAMS"[eye] * (f.pos.w - " I_STEREOPARAMS"[2]);\n");
 	}
 
 	if (primitive_type == PRIMITIVE_LINES)
