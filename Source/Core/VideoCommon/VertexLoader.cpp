@@ -269,6 +269,7 @@ void VertexLoader::CompileVertexTranslator()
 
 		if (tc[i] == NOT_PRESENT)
 		{
+			// TODO remove this
 			components &= ~(VB_HAS_UV0 << i);
 		}
 		else

@@ -9,6 +9,10 @@
 #include "VideoCommon/VertexLoader.h"
 #include "VideoCommon/VertexLoaderBase.h"
 
+#ifdef _M_X86_64
+#include "VideoCommon/VertexLoaderX64.h"
+#endif
+
 VertexLoaderBase::VertexLoaderBase(const TVtxDesc &vtx_desc, const VAT &vtx_attr)
 {
 	m_numLoadedVertices = 0;
@@ -176,7 +180,26 @@ public:
 			ERROR_LOG(VIDEO, "Both vertexloaders have loaded a different amount of vertices (a: %d, b: %d).", count_a, count_b);
 
 		if (memcmp(buffer_a.data(), buffer_b.data(), std::min(count_a, count_b) * m_native_vtx_decl.stride))
+		{
 			ERROR_LOG(VIDEO, "Both vertexloaders have loaded different data.");
+			printf("a:");
+			for (size_t i = 0; i < buffer_a.size(); i++)
+			{
+				if (i % 4 == 0)
+					printf(" ");
+				printf("%02x", buffer_a[i]);
+			}
+			puts("");
+
+			printf("b:");
+			for (size_t i = 0; i < buffer_b.size(); i++)
+			{
+				if (i % 4 == 0)
+					printf(" ");
+				printf("%02x", buffer_b[i]);
+			}
+			puts("");
+		}
 
 		memcpy(dst.GetPointer(), buffer_a.data(), count_a * m_native_vtx_decl.stride);
 		m_numLoadedVertices += count;
@@ -195,12 +218,19 @@ VertexLoaderBase* VertexLoaderBase::CreateVertexLoader(const TVtxDesc& vtx_desc,
 {
 	VertexLoaderBase* loader;
 
-#if 0
+//#define COMPARE_VERTEXLOADERS
+
+#if defined(COMPARE_VERTEXLOADERS) && defined(_M_X86_64)
 	// first try: Any new VertexLoader vs the old one
 	loader = new VertexLoaderTester(
 			new VertexLoader(vtx_desc, vtx_attr), // the software one
-			new VertexLoader(vtx_desc, vtx_attr), // the new one to compare
+			new VertexLoaderX64(vtx_desc, vtx_attr), // the new one to compare
 			vtx_desc, vtx_attr);
+	if (loader->IsInitialized())
+		return loader;
+	delete loader;
+#elif defined(_M_X86_64)
+	loader = new VertexLoaderX64(vtx_desc, vtx_attr);
 	if (loader->IsInitialized())
 		return loader;
 	delete loader;
