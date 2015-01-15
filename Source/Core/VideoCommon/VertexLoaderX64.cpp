@@ -37,10 +37,12 @@ OpArg VertexLoaderX64::GetVertexAddr(int array, u64 attribute)
 		if (attribute == INDEX8)
 		{
 			MOVZX(64, 8, scratch1, data);
+			m_src_ofs += 1;
 		}
 		else
 		{
 			MOV(16, R(scratch1), data);
+			m_src_ofs += 2;
 			BSWAP(16, scratch1);
 			MOVZX(64, 16, scratch1, R(scratch1));
 		}
@@ -57,22 +59,6 @@ OpArg VertexLoaderX64::GetVertexAddr(int array, u64 attribute)
 	else
 	{
 		return data;
-	}
-}
-
-inline void VertexLoaderX64::UpdateSourceOffset(u64 attribute, int load_bytes)
-{
-	switch (attribute)
-	{
-		case DIRECT:
-			m_src_ofs += load_bytes;
-			break;
-		case INDEX8:
-			m_src_ofs += sizeof(u8);
-			break;
-		case INDEX16:
-			m_src_ofs += sizeof(u16);
-			break;
 	}
 }
 
@@ -117,7 +103,8 @@ int VertexLoaderX64::ReadVertex(OpArg data, u64 attribute, int format, int count
 		MOVQ_xmm(coords, data);
 	else
 		MOVD_xmm(coords, data);
-	UpdateSourceOffset(attribute, load_bytes);
+	if (attribute == DIRECT)
+		m_src_ofs += load_bytes;
 
 	PSHUFB(coords, M(&shuffle_lut[format][count_in - 1]));
 
@@ -288,7 +275,8 @@ void VertexLoaderX64::ReadColor(OpArg data, u64 attribute, int format, int eleme
 			load_bytes = 3;
 			break;
 	}
-	UpdateSourceOffset(attribute, load_bytes);
+	if (attribute == DIRECT)
+		m_src_ofs += load_bytes;
 }
 
 void VertexLoaderX64::GenerateVertexLoader()

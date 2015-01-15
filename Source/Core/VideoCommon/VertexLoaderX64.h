@@ -15,7 +15,6 @@ private:
 	u32 m_src_ofs = 0;
 	u32 m_dst_ofs = 0;
 	Gen::FixupBranch m_skip_vertex;
-	inline void UpdateSourceOffset(u64 attribute, int load_bytes);
 	Gen::OpArg GetVertexAddr(int array, u64 attribute);
 	int ReadVertex(Gen::OpArg data, u64 attribute, int format, int count_in, int count_out, u8 scaling_exponent, AttributeFormat* native_format);
 	void ReadColor(Gen::OpArg data, u64 attribute, int format, int elements);
