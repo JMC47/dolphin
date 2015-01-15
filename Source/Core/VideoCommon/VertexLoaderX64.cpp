@@ -40,9 +40,9 @@ OpArg VertexLoaderX64::GetVertexAddr(int array, u64 attribute)
 		}
 		else
 		{
-			MOVZX(64, 16, scratch1, data);
-			// Convert to little-endian.
-			ROR(16, R(scratch1), Imm8(8));
+			MOV(16, R(scratch1), data);
+			BSWAP(16, scratch1);
+			MOVZX(64, 16, scratch1, R(scratch1));
 		}
 		if (array == ARRAY_POSITION)
 		{
@@ -185,17 +185,15 @@ void VertexLoaderX64::ReadColor(OpArg data, u64 attribute, int format, int eleme
 				MOV(32, R(scratch3), R(scratch1));
 				SHL(32, R(scratch1), Imm8(16));
 				AND(32, R(scratch1), Imm32(0xF8000000));
-				MOV(32, R(scratch2), R(scratch1));
 
-				MOV(32, R(scratch1), R(scratch3));
-				SHL(32, R(scratch1), Imm8(13));
-				AND(32, R(scratch1), Imm32(0x00FC0000));
-				OR(32, R(scratch2), R(scratch1));
+				MOV(32, R(scratch2), R(scratch3));
+				SHL(32, R(scratch2), Imm8(13));
+				AND(32, R(scratch2), Imm32(0x00FC0000));
+				OR(32, R(scratch1), R(scratch2));
 
 				SHL(32, R(scratch3), Imm8(11));
 				AND(32, R(scratch3), Imm32(0x0000F800));
-				OR(32, R(scratch2), R(scratch3));
-				MOV(32, R(scratch1), R(scratch2));
+				OR(32, R(scratch1), R(scratch3));
 			}
 
 			SHR(32, R(scratch1), Imm8(5));
@@ -411,7 +409,7 @@ void VertexLoaderX64::GenerateVertexLoader()
 
 	if (m_VtxDesc.PosMatIdx)
 	{
-		MOV(8, R(scratch1), MDisp(src_reg, posmatidx_ofs));
+		MOVZX(32, 8, scratch1, MDisp(src_reg, posmatidx_ofs));
 		AND(32, R(scratch1), Imm8(0x3F));
 		MOV(32, MDisp(dst_reg, m_dst_ofs), R(scratch1));
 		m_native_components |= VB_HAS_POSMTXIDX;
