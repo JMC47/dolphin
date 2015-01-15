@@ -4,6 +4,7 @@
 
 #include <vector>
 
+#include "Common/Profiler.h"
 #include "Common/StringUtil.h"
 
 #include "VideoCommon/VertexLoader.h"
@@ -173,8 +174,20 @@ public:
 		buffer_a.resize(count * a->m_native_vtx_decl.stride + 4);
 		buffer_b.resize(count * b->m_native_vtx_decl.stride + 4);
 
-		int count_a = a->RunVertices(primitive, count, src, DataReader(buffer_a.data(), buffer_a.data()+buffer_a.size()));
-		int count_b = b->RunVertices(primitive, count, src, DataReader(buffer_b.data(), buffer_b.data()+buffer_b.size()));
+		int count_a, count_b;
+		{
+			PROFILE("VertexLoader");
+			count_a = a->RunVertices(primitive, count, src, DataReader(buffer_a.data(), buffer_a.data()+buffer_a.size()));
+		}
+
+		{
+			PROFILE("VertexLoaderX64");
+			count_b = b->RunVertices(primitive, count, src, DataReader(buffer_b.data(), buffer_b.data()+buffer_b.size()));
+		}
+
+		{
+			PROFILE("profiling overhead");
+		}
 
 		if (count_a != count_b)
 			ERROR_LOG(VIDEO, "Both vertexloaders have loaded a different amount of vertices (a: %d, b: %d).", count_a, count_b);
@@ -218,7 +231,7 @@ VertexLoaderBase* VertexLoaderBase::CreateVertexLoader(const TVtxDesc& vtx_desc,
 {
 	VertexLoaderBase* loader;
 
-//#define COMPARE_VERTEXLOADERS
+#define COMPARE_VERTEXLOADERS
 
 #if defined(COMPARE_VERTEXLOADERS) && defined(_M_X86_64)
 	// first try: Any new VertexLoader vs the old one
