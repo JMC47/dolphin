@@ -153,7 +153,7 @@ void Setup()
 			}
 			// this split is needed so that we don't avoid claiming the interface when
 			// detaching the kernel driver is successful
-			if (ret != 0)
+			if (ret != 0 && ret != LIBUSB_ERROR_NOT_SUPPORTED)
 			{
 				continue;
 			}
