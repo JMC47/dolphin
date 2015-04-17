@@ -85,13 +85,13 @@ static inline void GenerateVertexShader(T& out, u32 components, API_TYPE api_typ
 			// Let's set up attributes
 			for (size_t i = 0; i < 8; ++i)
 			{
-				if (i < xfmem.numTexGen.numTexGens)
+				if (i < uid_data->numTexGens)
 				{
 					out.Write("centroid out float3 uv%d;\n", i);
 				}
 			}
 			out.Write("centroid out float4 clipPos;\n");
-			if (g_ActiveConfig.bEnablePixelLighting)
+			if (uid_data->pixel_lighting)
 			{
 				out.Write("centroid out float3 Normal;\n");
 				out.Write("centroid out float3 WorldPos;\n");
@@ -180,7 +180,7 @@ static inline void GenerateVertexShader(T& out, u32 components, API_TYPE api_typ
 			"float dist, dist2, attn;\n");
 
 	uid_data->numColorChans = xfmem.numChan.numColorChans;
-	if (xfmem.numChan.numColorChans == 0)
+	if (uid_data->numColorChans == 0)
 	{
 		if (components & VB_HAS_COL0)
 			out.Write("o.colors_0 = color0;\n");
@@ -190,7 +190,7 @@ static inline void GenerateVertexShader(T& out, u32 components, API_TYPE api_typ
 
 	GenerateLightingShader<T>(out, uid_data->lighting, components, "color", "o.colors_");
 
-	if (xfmem.numChan.numColorChans < 2)
+	if (uid_data->numColorChans < 2)
 	{
 		if (components & VB_HAS_COL1)
 			out.Write("o.colors_1 = color1;\n");
@@ -208,13 +208,13 @@ static inline void GenerateVertexShader(T& out, u32 components, API_TYPE api_typ
 
 	// transform texcoords
 	out.Write("float4 coord = float4(0.0, 0.0, 1.0, 1.0);\n");
-	for (unsigned int i = 0; i < xfmem.numTexGen.numTexGens; ++i)
+	for (unsigned int i = 0; i < uid_data->numTexGens; ++i)
 	{
-		TexMtxInfo& texinfo = xfmem.texMtxInfo[i];
+		const TexMtxInfo& texinfo = xfmem.texMtxInfo[i];
 
 		out.Write("{\n");
 		out.Write("coord = float4(0.0, 0.0, 1.0, 1.0);\n");
-		uid_data->texMtxInfo[i].sourcerow = xfmem.texMtxInfo[i].sourcerow;
+		uid_data->texMtxInfo[i].sourcerow = texinfo.sourcerow;
 		switch (texinfo.sourcerow)
 		{
 		case XF_SRCGEOM_INROW:
@@ -253,7 +253,7 @@ static inline void GenerateVertexShader(T& out, u32 components, API_TYPE api_typ
 		}
 
 		// first transformation
-		uid_data->texMtxInfo[i].texgentype = xfmem.texMtxInfo[i].texgentype;
+		uid_data->texMtxInfo[i].texgentype = texinfo.texgentype;
 		switch (texinfo.texgentype)
 		{
 			case XF_TEXGEN_EMBOSS_MAP: // calculate tex coords into bump map
@@ -261,15 +261,15 @@ static inline void GenerateVertexShader(T& out, u32 components, API_TYPE api_typ
 				if (components & (VB_HAS_NRM1|VB_HAS_NRM2))
 				{
 					// transform the light dir into tangent space
-					uid_data->texMtxInfo[i].embosslightshift = xfmem.texMtxInfo[i].embosslightshift;
-					uid_data->texMtxInfo[i].embosssourceshift = xfmem.texMtxInfo[i].embosssourceshift;
+					uid_data->texMtxInfo[i].embosslightshift = texinfo.embosslightshift;
+					uid_data->texMtxInfo[i].embosssourceshift = texinfo.embosssourceshift;
 					out.Write("ldir = normalize(" LIGHT_POS".xyz - pos.xyz);\n", LIGHT_POS_PARAMS(texinfo.embosslightshift));
 					out.Write("o.tex%d.xyz = o.tex%d.xyz + float3(dot(ldir, _norm1), dot(ldir, _norm2), 0.0);\n", i, texinfo.embosssourceshift);
 				}
 				else
 				{
 					_assert_(0); // should have normals
-					uid_data->texMtxInfo[i].embosssourceshift = xfmem.texMtxInfo[i].embosssourceshift;
+					uid_data->texMtxInfo[i].embosssourceshift = texinfo.embosssourceshift;
 					out.Write("o.tex%d.xyz = o.tex%d.xyz;\n", i, texinfo.embosssourceshift);
 				}
 
@@ -284,7 +284,7 @@ static inline void GenerateVertexShader(T& out, u32 components, API_TYPE api_typ
 				break;
 			case XF_TEXGEN_REGULAR:
 			default:
-				uid_data->texMtxInfo_n_projection |= xfmem.texMtxInfo[i].projection << i;
+				uid_data->texMtxInfo_n_projection |= texinfo.projection << i;
 				if (components & (VB_HAS_TEXMTXIDX0<<i))
 				{
 					out.Write("int tmp = int(tex%d.z);\n", i);
@@ -309,7 +309,7 @@ static inline void GenerateVertexShader(T& out, u32 components, API_TYPE api_typ
 		{
 			const PostMtxInfo& postInfo = xfmem.postMtxInfo[i];
 
-			uid_data->postMtxInfo[i].index = xfmem.postMtxInfo[i].index;
+			uid_data->postMtxInfo[i].index = postInfo.index;
 			int postidx = postInfo.index;
 			out.Write("float4 P0 = " I_POSTTRANSFORMMATRICES"[%d];\n"
 				"float4 P1 = " I_POSTTRANSFORMMATRICES"[%d];\n"
@@ -327,7 +327,7 @@ static inline void GenerateVertexShader(T& out, u32 components, API_TYPE api_typ
 			}
 			else
 			{
-				uid_data->postMtxInfo[i].normalize = xfmem.postMtxInfo[i].normalize;
+				uid_data->postMtxInfo[i].normalize = postInfo.normalize;
 				if (postInfo.normalize)
 					out.Write("o.tex%d.xyz = normalize(o.tex%d.xyz);\n", i, i);
 
