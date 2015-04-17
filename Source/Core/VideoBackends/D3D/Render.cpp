@@ -416,6 +416,8 @@ u32 Renderer::AccessEFB(EFBAccessType type, u32 x, u32 y, u32 poke_data)
 		if (SUCCEEDED(D3D::context->Map(read_tex, 0, D3D11_MAP_READ, 0, &map)))
 		{
 			val = *(float*)map.pData;
+			// depth buffer logic is inverted in d3d
+			val = 1.f - val;
 			D3D::context->Unmap(read_tex, 0);
 		}
 
@@ -526,8 +528,8 @@ void Renderer::SetViewport()
 	Ht = (Y + Ht <= GetTargetHeight()) ? Ht : (GetTargetHeight() - Y);
 
 	D3D11_VIEWPORT vp = CD3D11_VIEWPORT(X, Y, Wd, Ht,
-		std::max(0.0f, std::min(1.0f, (xfmem.viewport.farZ - xfmem.viewport.zRange) / 16777216.0f)),
-		std::max(0.0f, std::min(1.0f, xfmem.viewport.farZ / 16777216.0f)));
+		std::max(0.0f, std::min(1.0f, 1.0f - xfmem.viewport.farZ / 16777216.0f)),
+		std::max(0.0f, std::min(1.0f, 1.0f - (xfmem.viewport.farZ - xfmem.viewport.zRange) / 16777216.0f)));
 	D3D::context->RSSetViewports(1, &vp);
 }
 
@@ -552,7 +554,7 @@ void Renderer::ClearScreen(const EFBRectangle& rc, bool colorEnable, bool alphaE
 
 	// Color is passed in bgra mode so we need to convert it to rgba
 	u32 rgbaColor = (color & 0xFF00FF00) | ((color >> 16) & 0xFF) | ((color << 16) & 0xFF0000);
-	D3D::drawClearQuad(rgbaColor, (z & 0xFFFFFF) / float(0xFFFFFF));
+	D3D::drawClearQuad(rgbaColor, (0xFFFFFF - (z & 0xFFFFFF)) / float(0xFFFFFF));
 
 	D3D::stateman->PopDepthState();
 	D3D::stateman->PopBlendState();
