@@ -411,10 +411,14 @@ u32 Renderer::AccessEFB(EFBAccessType type, u32 x, u32 y, u32 poke_data)
 
 		RestoreAPIState(); // restore game state
 
+		float val = 0.f;
 		// read the data from system memory
-		D3D::context->Map(read_tex, 0, D3D11_MAP_READ, 0, &map);
+		if (SUCCEEDED(D3D::context->Map(read_tex, 0, D3D11_MAP_READ, 0, &map)))
+		{
+			val = *(float*)map.pData;
+			D3D::context->Unmap(read_tex, 0);
+		}
 
-		float val = *(float*)map.pData;
 		u32 ret = 0;
 		if (bpmem.zcontrol.pixel_format == PEControl::RGB565_Z16)
 		{
@@ -425,7 +429,6 @@ u32 Renderer::AccessEFB(EFBAccessType type, u32 x, u32 y, u32 poke_data)
 		{
 			ret = ((u32)(val * 0xffffff));
 		}
-		D3D::context->Unmap(read_tex, 0);
 
 		// TODO: in RE0 this value is often off by one in Video_DX9 (where this code is derived from), which causes lighting to disappear
 		return ret;
@@ -438,11 +441,12 @@ u32 Renderer::AccessEFB(EFBAccessType type, u32 x, u32 y, u32 poke_data)
 		D3D::context->CopySubresourceRegion(read_tex, 0, 0, 0, 0, FramebufferManager::GetEFBColorTexture()->GetTex(), 0, &box);
 
 		// read the data from system memory
-		D3D::context->Map(read_tex, 0, D3D11_MAP_READ, 0, &map);
 		u32 ret = 0;
-		if (map.pData)
+		if (SUCCEEDED(D3D::context->Map(read_tex, 0, D3D11_MAP_READ, 0, &map)))
+		{
 			ret = *(u32*)map.pData;
-		D3D::context->Unmap(read_tex, 0);
+			D3D::context->Unmap(read_tex, 0);
+		}
 
 		// check what to do with the alpha channel (GX_PokeAlphaRead)
 		PixelEngine::UPEAlphaReadReg alpha_read_mode = PixelEngine::GetAlphaReadMode();
