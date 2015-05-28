@@ -58,27 +58,24 @@ static void GenerateLightShader(T& object, LightingUidData& uid_data, int index,
 	uid_data.attnfunc |= chan.attnfunc << (2*litchan_index);
 	uid_data.diffusefunc |= chan.diffusefunc << (2*litchan_index);
 
+	object.Write("ldir = " LIGHT_POS".xyz - pos.xyz;\n", LIGHT_POS_PARAMS(index));
+	object.Write("dist2 = dot(ldir, ldir);\n"
+	             "dist = sqrt(dist2);\n"
+	             "ldir = dist > 0.0 ? ldir / dist : _norm0;\n");
 	switch (chan.attnfunc)
 	{
 		case LIGHTATTN_NONE:
 		case LIGHTATTN_DIR:
-			object.Write("ldir = normalize(" LIGHT_POS".xyz - pos.xyz);\n", LIGHT_POS_PARAMS(index));
 			object.Write("attn = 1.0;\n");
-			object.Write("if (length(ldir) == 0.0)\n\t ldir = _norm0;\n");
 			break;
 		case LIGHTATTN_SPEC:
-			object.Write("ldir = normalize(" LIGHT_POS".xyz - pos.xyz);\n", LIGHT_POS_PARAMS(index));
 			object.Write("attn = (dot(_norm0, ldir) >= 0.0) ? max(0.0, dot(_norm0, " LIGHT_DIR".xyz)) : 0.0;\n", LIGHT_DIR_PARAMS(index));
 			object.Write("cosAttn = " LIGHT_COSATT".xyz;\n", LIGHT_COSATT_PARAMS(index));
 			object.Write("distAttn = %s(" LIGHT_DISTATT".xyz);\n", (chan.diffusefunc == LIGHTDIF_NONE) ? "" : "normalize", LIGHT_DISTATT_PARAMS(index));
 			object.Write("attn = max(0.0f, dot(cosAttn, float3(1.0, attn, attn*attn))) / dot(distAttn, float3(1.0, attn, attn*attn));\n");
 			break;
 		case LIGHTATTN_SPOT:
-			object.Write("ldir = " LIGHT_POS".xyz - pos.xyz;\n", LIGHT_POS_PARAMS(index));
-			object.Write("dist2 = dot(ldir, ldir);\n"
-				"dist = sqrt(dist2);\n"
-				"ldir = ldir / dist;\n"
-				"attn = max(0.0, dot(ldir, " LIGHT_DIR".xyz));\n",	LIGHT_DIR_PARAMS(index));
+			object.Write("attn = max(0.0, dot(ldir, " LIGHT_DIR".xyz));\n",	LIGHT_DIR_PARAMS(index));
 			// attn*attn may overflow
 			object.Write("attn = max(0.0, " LIGHT_COSATT".x + " LIGHT_COSATT".y*attn + " LIGHT_COSATT".z*attn*attn) / dot(" LIGHT_DISTATT".xyz, float3(1.0,dist,dist2));\n",
 				LIGHT_COSATT_PARAMS(index), LIGHT_COSATT_PARAMS(index), LIGHT_COSATT_PARAMS(index), LIGHT_DISTATT_PARAMS(index));

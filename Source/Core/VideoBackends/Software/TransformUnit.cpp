@@ -213,19 +213,21 @@ static float CalculateLightAttn(const LightPointer *light, Vec3* _ldir, const Ve
 	float attn = 1.0f;
 	Vec3& ldir = *_ldir;
 
+	float dist2 = ldir.Length2();
+	float dist = sqrtf(dist2);
+	if (dist > 0.0f)
+		ldir = ldir / dist;
+	else
+		ldir = normal;
 	switch (chan.attnfunc)
 	{
 		case LIGHTATTN_NONE:
 		case LIGHTATTN_DIR:
 		{
-			ldir = ldir.Normalized();
-			if (ldir == Vec3(0.0f, 0.0f, 0.0f))
-				ldir = normal;
 			break;
 		}
 		case LIGHTATTN_SPEC:
 		{
-			ldir = ldir.Normalized();
 			attn = (ldir * normal) >= 0.0 ? std::max(0.0f, light->dir * normal) : 0;
 			Vec3 attLen = Vec3(1.0, attn, attn*attn);
 			Vec3 cosAttn = light->cosatt;
@@ -238,9 +240,6 @@ static float CalculateLightAttn(const LightPointer *light, Vec3* _ldir, const Ve
 		}
 		case LIGHTATTN_SPOT:
 		{
-			float dist2 = ldir.Length2();
-			float dist = sqrtf(dist2);
-			ldir = ldir / dist;
 			attn = std::max(0.0f, ldir * light->dir);
 
 			float cosAtt = light->cosatt.x + (light->cosatt.y * attn) + (light->cosatt.z * attn * attn);
