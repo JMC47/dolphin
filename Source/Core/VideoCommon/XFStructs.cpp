@@ -108,6 +108,8 @@ static void XFRegWritten(int transferSize, u32 baseAddress, DataReader src)
     case XFMEM_SETVIEWPORT + 3:
     case XFMEM_SETVIEWPORT + 4:
     case XFMEM_SETVIEWPORT + 5:
+		WARN_LOG(VIDEO, "viewport: %f %f %f; %f %f %f\n", xfmem.viewport.wd, xfmem.viewport.ht, xfmem.viewport.zRange, xfmem.viewport.xOrig, xfmem.viewport.yOrig, xfmem.viewport.farZ);
+		xfmem.viewport.ht = -fabsf(xfmem.viewport.ht);
       g_vertex_manager->Flush();
       VertexShaderManager::SetViewportChanged();
       PixelShaderManager::SetViewportChanged();

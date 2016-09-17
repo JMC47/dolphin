@@ -6,6 +6,7 @@
 
 #include "Common/CommonTypes.h"
 #include "VideoCommon/CPMemory.h"
+#include "Common/Logging/Log.h"
 
 class DataReader;
 
