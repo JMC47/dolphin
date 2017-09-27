@@ -431,7 +431,7 @@ IPCCommandResult SDIOSlot0::SendCommand(const IOCtlRequest& request)
     return GetNoReply();
   }
 
-  return GetDefaultReply(IPC_SUCCESS);
+  return{IPC_SUCCESS, true, SystemTimers::GetTicksPerSecond() / 20000};
 }
 
 IPCCommandResult SDIOSlot0::GetStatus(const IOCtlRequest& request)
@@ -490,7 +490,7 @@ IPCCommandResult SDIOSlot0::SendCommand(const IOCtlVRequest& request)
                      request.in_vectors[1].address, request.in_vectors[1].size,
                      request.io_vectors[0].address, request.io_vectors[0].size);
 
-  return GetDefaultReply(return_value);
+  return {return_value, true, SystemTimers::GetTicksPerSecond() / 20000 };
 }
 
 u32 SDIOSlot0::GetOCRegister() const
