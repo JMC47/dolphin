@@ -363,13 +363,13 @@ void RegisterMMIO(MMIO::Mapping* mmio, u32 base)
                  MMIO::ComplexRead<u16>([](u32) { return m_UnkAARegister >> 16; }),
                  MMIO::ComplexWrite<u16>([](u32, u16 val) {
                    m_UnkAARegister = (m_UnkAARegister & 0x0000FFFF) | ((u32)val << 16);
-                   WARN_LOG_FMT(VIDEOINTERFACE, "Writing to the unknown AA register (hi)");
+                   //WARN_LOG_FMT(VIDEOINTERFACE, "Writing to the unknown AA register (hi)");
                  }));
   mmio->Register(base | VI_UNK_AA_REG_LO,
                  MMIO::ComplexRead<u16>([](u32) { return m_UnkAARegister & 0xFFFF; }),
                  MMIO::ComplexWrite<u16>([](u32, u16 val) {
                    m_UnkAARegister = (m_UnkAARegister & 0xFFFF0000) | val;
-                   WARN_LOG_FMT(VIDEOINTERFACE, "Writing to the unknown AA register (lo)");
+                   //WARN_LOG_FMT(VIDEOINTERFACE, "Writing to the unknown AA register (lo)");
                  }));
 
   // Control register writes only updates some select bits, and additional
@@ -819,8 +819,68 @@ static void BeginField(FieldType field, u64 ticks)
     g_video_backend->Video_BeginField(xfbAddr, fbWidth, fbStride, fbHeight, ticks);
 }
 
-static void EndField()
+static void EndField(FieldType field, u64 ticks)
 {
+    // Could we fit a second line of data in the stride?
+    // (Datel's Wii FreeLoaders are the only titles known to set WPL to 0)
+    bool potentially_interlaced_xfb =
+        m_PictureConfiguration.WPL != 0 &&
+        ((m_PictureConfiguration.STD / m_PictureConfiguration.WPL) == 2);
+    // Are there an odd number of half-lines per field (definition of interlaced video)
+    bool interlaced_video_mode = (GetHalfLinesPerEvenField() & 1) == 1;
+
+    u32 fbStride = m_PictureConfiguration.STD * 16;
+    u32 fbWidth = m_PictureConfiguration.WPL * 16;
+    u32 fbHeight = m_VerticalTimingRegister.ACV;
+
+    u32 xfbAddr;
+
+    if (field == FieldType::Even)
+    {
+      xfbAddr = GetXFBAddressBottom();
+    }
+    else
+    {
+      xfbAddr = GetXFBAddressTop();
+    }
+
+    // Multiply the stride by 2 to get the byte offset for each subsequent line.
+    fbStride *= 2;
+
+    if (potentially_interlaced_xfb && interlaced_video_mode && g_ActiveConfig.bForceProgressive)
+    {
+      // Strictly speaking, in interlaced mode, we're only supposed to read
+      // half of the lines of the XFB, and use that to display a field; the
+      // other lines are unspecified junk.  However, in practice, we can
+      // almost always double the vertical resolution of the output by
+      // forcing progressive output: there's usually useful data in the
+      // other field.  One notable exception: the title screen teaser
+      // videos in Metroid Prime don't render correctly using this hack.
+      fbStride /= 2;
+      fbHeight *= 2;
+
+      // PRB for the different fields should only ever differ by 1 in
+      // interlaced mode, and which is less determines which field
+      // has the first line. For the field with the second line, we
+      // offset the xfb by (-stride_of_one_line) to get the start
+      // address of the full xfb.
+      if (field == FieldType::Odd && m_VBlankTimingOdd.PRB == m_VBlankTimingEven.PRB + 1 && xfbAddr)
+        xfbAddr -= fbStride;
+
+      if (field == FieldType::Even && m_VBlankTimingOdd.PRB == m_VBlankTimingEven.PRB - 1 &&
+          xfbAddr)
+        xfbAddr -= fbStride;
+    }
+
+    LogField(field, xfbAddr);
+
+    // This assumes the game isn't going to change the VI registers while a
+    // frame is scanning out.
+    // To correctly handle that case we would need to collate all changes
+    // to VI during scanout and delay outputting the frame till then.
+    if (xfbAddr)
+      g_video_backend->Video_BeginField(xfbAddr, fbWidth, fbStride, fbHeight, ticks);
+    
   Core::VideoThrottle();
   Core::OnFrameEnd();
 }
@@ -849,11 +909,11 @@ void Update(u64 ticks)
   }
   else if (s_half_line_count == s_even_field_last_hl)
   {
-    EndField();
+    EndField(FieldType::Even, ticks);
   }
   else if (s_half_line_count == s_odd_field_last_hl)
   {
-    EndField();
+    EndField(FieldType::Odd, ticks);
   }
 
   // If this half-line is at a field boundary, deal with frame stepping before potentially
